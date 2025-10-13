@@ -1,0 +1,102 @@
+# Preemie 6: Resource Loader
+
+## Next Steps
+- [X] Add additional distibution options
+    - On the distrubutions page, plot them to easlily visualize them
+- [X] Add 3 more columns. Place check box to turn off algo if you want.
+    - Relationship type (FS, SS) *There will not be FF
+    - Lag
+    - Relationship with (ActivityID, or Next)
+        - Make sure that selection exists in activity IDs
+- [ ] Add a field (text box maybe) for resource type and unit.
+    - Will add an addtional column for that. call it: Category
+- [ ] Make some plot design decisions, standardization.
+- [ ] Add addtional column for activity category. This should be between activity id and activity description
+    - Start a new column on the plot sheet when there is a new category. 
+---
+### Addtional Distrubution Options
+### Addtional Columns
+With additional columns we can essencailly make a mini P6 that could be used to produce look ahead schedules what if scenarios where you can change the distribution of resources.
+
+With relationship data, critical path could be calculated, and highlighted.
+
+All the user would need to provide is a SINGLE start date and durations for each activity, and the relationship columns, probably set default to "FS with next".
+
+```
+Pseudo Code:
+Inside AssignDistributionToDates loop:
+
+currentFinishDateColumn = cell(current row, finishDateCol#)
+If currentFinishDateColumn == "":
+    Take the last currentDate in that loop and assign the finishDate to that date
+
+# If the start column for the next activity is empty. If there is no duration, then there will be a msg box pop up with a warning
+
+#take activity ID return finishDate or startDate:
+def IDDate(relationship):
+    id = relationship
+    row = index(id, activityIDs)
+    startDate = cellValue(row, startDateColumn)
+    finishDate = cellValue(row, finishDateColumn)
+    dates = [startDate, finishDate]
+    return dates
+
+
+Lag = 0 #Default
+relationship = cellValue #at relationship Column
+previousFinishDate = currentRow-1, column = finishDate
+previousStartDate = currentRow-1, column = startDate 
+
+If startDateColumn == "":
+    Look at the relationship column
+    If relationshipType == FS:
+        If relationship is "Next":
+            If lagValue NOT "":
+                lag = lagValue
+            startDate = previousFinishDate + Lag
+        Else:
+            IdFinishDate = IDDate(relationship)[1]
+            startDate = IdFinishDate + Lag
+
+    If relationshipType == SS:
+        If relationship is "Next":
+            If lagValue NOT "":
+                lag = lagValue
+            startDate = previousStartDate + Lag
+        Else:
+            IdStartDate = IDDate(relationship)[0]
+            startDate = IdStartDate + Lag
+Continue to next line...
+```
+
+Also i want to fix my y axis plez
+#Be able to dist, over durations longer than 100, rather longer than my distrub table.
+
+```
+x = dur / 100
+# of units per pecernt to apply to each duration perid
+````
+- [x] Fix max value
+  - Take max largest DAY value, not the total cumulative
+the largest delta between 2 days is the max value for the maxVal
+
+
+## 9/5/25
+### Feature Requests
+- [ ] "Schedule" should not overwrite the plot tab. If the category is the SAME then overwrite.
+- [ ] Need to read the category
+  - [ ] if category is not at header of plot already, create a new header
+  - [ ] put the category data in that column.
+- [ ] Need to improve the Add Plot function. Do I need this..? The thought behind it was you would do all your scheduling, and when you were content you could "Add Plot". Maybe that is accomplished when you just do move on to the next category.
+- [ ] Improve the actual plot visualization
+  - [ ] Need ability to do plot multiple lines on the visualization
+
+IF it is essencial to add mutliple columns for the activity description ie. Building, Area, Level, etc. 
+
+```
+Pseduo Code:
+After column 2 "category" 
+Count # of columns prior to duration, these are the activity code and description
+Assign new column # to the existing column locations ie, duration, start date etc.
+```
+This way the user can add as many activitiy codes as they want

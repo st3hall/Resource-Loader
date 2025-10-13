@@ -1,0 +1,2661 @@
+
+
+Function ActivateGanttSheet()
+    Worksheets(1).Activate
+End Function
+
+'This function will return the range of the distribution table or calendar based on the name provided. It will be used to get the correct range for the distribution values.
+Function GetTableRange(rangeName As String) As Range
+    Dim cell As Range
+    Dim tableRange As Range
+    Dim foundInDist As Boolean
+    Dim foundInCal As Boolean
+
+    foundInDist = False
+    foundInCal = False
+
+    ' Check if rangeName is in DistType
+    On Error Resume Next
+    For Each cell In Range("DistType")
+        If StrComp(cell.Value, rangeName, vbTextCompare) = 0 Then
+            foundInDist = True
+            Exit For
+        End If
+    Next cell
+
+    ' Check if rangeName is in CalType
+    If Not foundInDist Then
+        For Each cell In Range("CalType")
+            If StrComp(cell.Value, rangeName, vbTextCompare) = 0 Then
+                foundInCal = True
+                Exit For
+            End If
+        Next cell
+    End If
+    On Error GoTo 0
+
+    ' Assign the appropriate table range
+    If foundInDist Then
+        Set tableRange = ThisWorkbook.Names("DistTab").RefersToRange
+        'Debug.Print "Table Range Address: " & tableRange.Address
+        'Debug.Print "Sheet Name: " & tableRange.Worksheet.Name
+
+
+    ElseIf foundInCal Then
+        Set tableRange = ThisWorkbook.Names("Calendar").RefersToRange
+        'Debug.Print "Table Range Address: " & tableRange.Address
+        'Debug.Print "Sheet Name: " & tableRange.Worksheet.Name
+
+    Else
+        Set tableRange = Nothing ' Or handle error
+    End If
+    
+    'Debug.Print "Found in DistType: " & foundInDist
+    'Debug.Print "Found in CalType: " & foundInCal
+
+
+    Set GetTableRange = tableRange
+    'Debug.Print "Table Range " & GetTableRange.Address
+    'Debug.Print "Sheet Name: " & GetTableRange.Worksheet.Name
+    
+End Function
+
+
+'This function will return the distribution values for the given distribution type from the distribution table. Will also use to get the calendar working days.
+'Header will be either CalType or DistType
+Function GetColumn(Header As String) As Variant
+    Dim tableRange As Range
+    Dim colIndex As Long
+    Dim result() As Double
+    Dim i As Long
+    Dim dataRange As Range
+
+    ' Get the full table range (including header row)
+    Set tableRange = GetTableRange(Header)
+    
+
+    ' Find the column index for the header
+    For colIndex = 1 To tableRange.Columns.Count
+        If tableRange.Cells(1, colIndex).Value = Header Then
+            Exit For
+        End If
+    Next colIndex
+
+    ' If header not found
+    If colIndex > tableRange.Columns.Count Then
+        GetColumn = CVErr(xlErrNA)
+        Exit Function
+    End If
+
+    ' Define the data range (excluding the header row)
+    Set dataRange = tableRange.Offset(1, 0).Resize(tableRange.Rows.Count - 1)
+
+    ' Resize result array
+    ReDim result(1 To dataRange.Rows.Count)
+
+    ' Fill result array with values from the column
+    For i = 1 To dataRange.Rows.Count
+        result(i) = dataRange.Cells(i, colIndex).Value
+    Next i
+
+    ' Return the result array
+    GetColumn = result
+End Function
+
+
+'Array that holds the distribution percentages based on the duration. ie. If you have 10 days duration = 10 values, each a sum of the distribution values from the table multiplied to the resource.
+'Distribution = GetColumn(CalType OR DistType)
+Function SumByDistributions(Distribution As String, Duration As Double) As Variant
+    Dim outputArray() As Double
+    Dim i As Long, j As Long
+    Dim groupSum As Double
+    Dim inputArray() As Double
+    inputArray = GetColumn(Distribution)
+    'Dim NumOfDist As Double
+    'NumOfDist = 100 / Duration
+    'Dim groupCount As Long
+
+    'groupCount = Int(UBound(inputArray) / NumOfDist)
+    ReDim outputArray(0 To Duration - 1)
+
+    For i = 0 To Duration - 1
+        groupSum = 0
+        For j = 1 To Duration
+            groupSum = groupSum + inputArray(i * Duration + j)
+        Next j
+        outputArray(i) = groupSum
+    Next i
+
+    'This will sum the values in the inputArray by groups based on the Duration, then return the outputArray with the summed values.
+    SumByDistributions = outputArray
+End Function
+
+'This function takes the product of Summed Distribution and resource and creates an array.
+Function CreateDistributionArray(Duration As Double, Resourse As Double, Distribution As String) As Variant
+    inputArray = SumByDistributions(Distribution, Duration)
+    Dim i As Long
+    Dim outputArray() As Double
+    resource = Resourse
+
+    'Calculate the number of distributions based on the duration
+    'Duration = 100 / Duration
+    
+    'Resize the output array to hold the summed values
+    ReDim outputArray(0 To Duration - 1)
+    For i = 0 To Duration - 1
+        'Multiply each summed distribution value by the resource value
+        outputArray(i) = inputArray(i) * resource
+        'Debug.Print "outputArray(" & i & ") = " & outputArray(i)
+    Next i
+    'Return the output array with the summed distribution values
+    'Debug.Print TypeName(outputArray(0))
+    CreateDistributionArray = outputArray
+    'Debug.Print "Found in CalType: " & foundInCal
+End Function
+
+'Function that takes the distribution array (Resource value * summed distribution values, one per each duration) and then assigns each value in the array to the corresponding date based on the start and the duration. Need to take the start date, then look at the calendar selected, evaluate if a date is a working day, and if it is, assign the value to that date. If not, skip to the next date. And do the same thing for holidays. There are 6 caldnars to choose from, so the function will take the calendar name as a parameter. The output will be an array of values corresponding to each date in the duration, with zeroes for non-working days. If the name of the calendar contains "NoHol" then it will not check for holidays, just working days.
+
+    'For each date in the start date + duration:
+        'Check if the date is a working day:
+            'Check if date is in the Holiday list:
+                'If it is NOT, assign the corresponding value from the distribution array to that date.
+            'If it is not, assign zero or skip as needed.
+    'Move to the next date
+    'Return the output array with assigned distribution values for each date in the duration.
+
+Function AssignDistributionToDates(Start As Date, Duration As Double, DistributionArray As Variant, Calendar As String) As Variant
+    Dim outputArray() As Double
+    Dim i As Long
+    Dim workingDayCount As Integer
+    Dim calendarRange As Double
+    Dim holidays As Range
+    Dim calendarWorkDays As Variant
+    Dim currentDateIndex As Integer
+    Dim isWorkingDay As Boolean
+
+    
+    
+    ReDim outputArray(0 To Duration * (7 / 5))
+
+    currentDate = Start
+    holidayRange = Range("Holidays")
+    'calendarRange = GetColumn("CalType") will get the calendarWorkDays to work first
+    calendarWorkDays = Array(1, 1, 1, 1, 1, 0, 0) ' Monday to Sunday
+
+    i = 0
+    Do While workingDayCount < Duration
+        currentDateIndex = Weekday(currentDate, vbMonday) ' 1 = Monday, 7 = Sunday
+    
+        ' Default value
+        outputArray(i) = 0
+    
+        ' Check if it's a working weekday
+        If calendarWorkDays(currentDateIndex - 1) = 1 Then
+            ' Check if it's a holiday
+            isHoliday = Not IsError(Application.Match(currentDate, holidayRange, 0))
+    
+            If Not isHoliday Then
+                ' It's a working day and not a holiday
+                outputArray(i) = DistributionArray(workingDayCount)
+                workingDayCount = workingDayCount + 1
+                Debug.Print "Output Array(" & workingDayCount & "): " & DistributionArray(workingDayCount - 1)
+                
+                ' Only increment i if we assigned from DistributionArray
+                
+            Else
+                Debug.Print "Output Array(" & workingDayCount & "): " & outputArray(i)
+            End If
+        Else
+            Debug.Print "Output Array(" & workingDayCount & "): " & outputArray(i)
+        End If
+    
+        ' Move to the next date regardless
+        currentDate = currentDate + 1
+        i = i + 1
+    Loop
+
+
+    'Return the output array with assigned distribution values for each date in the duration
+    AssignDistributionToDates = outputArray
+End Function
+
+'This function will return the last column range starting from column J (10), where my dates start to the last used column in the first row. Should return the same row everytime.
+Function GetLastColumnRange() As Range
+    Dim lastCol As Long
+    lastCol = Cells(1, Columns.Count).End(xlToLeft).Column
+    Set GetLastColumnRange = Range(Cells(1, 10), Cells(1, lastCol)) ' Column 10 = J
+End Function
+
+'This function will find the cell that contains the target date in the specified search range. We will already be on the correct row so we want to return the column value of the cell that contains the date.
+Function FindDateColumn(startDate As Date) As Variant
+    Dim matchIndex As Variant
+    Dim searchRange As Range
+    Dim lastCol As Long
+    
+
+    ' Ensure startDate is a pure date
+    startDate = DateValue(startDate)
+    lastCol = Cells(1, Columns.Count).End(xlToLeft).Column
+
+    ' Define the range (dates in row 1, columns J to DE)
+    Set searchRange = Range(Cells(1, 10), Cells(1, lastCol)) ' J1 to DE1
+
+    ' Use Match with exact match
+    matchIndex = Application.Match(CLng(startDate), searchRange, 0)
+
+    If IsError(matchIndex) Then
+        FindDateColumn = CVErr(xlErrNA)
+    Else
+        ' Add 9 to align with your indexing logic
+        FindDateColumn = matchIndex + 9
+    End If
+End Function
+
+'This subroutine will take outputArray (the array that holds the distribution values) for each date in the duration
+Sub WriteToCells()
+    Dim currentCell As Range
+    Dim distArray As Variant
+    Dim resultArray As Variant
+    Dim startingCol As Variant
+
+    Dim Duration As Double
+    Dim startDate As Date
+    Dim finishDate As Date
+    Dim resource As Double
+    Dim distributionType As String
+    Dim calendarType As String
+    
+    ActivateGanttSheet
+
+    ' Loop through non-empty cells in column A
+    For Each currentCell In Range("A2:A" & Cells(Rows.Count, 1).End(xlUp).Row)
+        If Not IsEmpty(currentCell.Value) Then
+            Dim currentRow As Long
+            currentRow = currentCell.Row
+
+            ' Get values from the same row
+            Duration = Cells(currentRow, 3).Value          ' Column C
+            startDate = Cells(currentRow, 4).Value         ' Column D
+            finishDate = Cells(currentRow, 5).Value        ' Column E, this probably wont be used
+            resource = Cells(currentRow, 6).Value          ' Column F
+            distributionType = Cells(currentRow, 7).Value  ' Column G
+            calendarType = Cells(currentRow, 8).Value      ' Column H
+
+            ' Generate distribution and assign values
+            distArray = CreateDistributionArray(Duration, resource, distributionType)
+            resultArray = AssignDistributionToDates(startDate, Duration, distArray, calendarType)
+            startingCol = FindDateColumn(startDate)
+
+            ' Write resultArray to the row starting at startingCol
+            Dim i As Long
+            For i = LBound(resultArray) To UBound(resultArray)
+                Cells(currentRow, startingCol + i - 1).Value = resultArray(i)
+            Next i
+        End If
+    Next currentCell
+End Sub
+
+Sub DebugDateRange()
+    Dim cell As Range
+    Dim rng As Range
+    Set rng = GetLastColumnRange()
+
+    Debug.Print "Range is: " & rng.Address(False, False)
+
+    For Each cell In rng
+        Debug.Print "Cell Value: " & cell.Value & " | Type: " & TypeName(cell.Value)
+    Next cell
+End Sub
+
+Sub FormatDateRange()
+    Dim cell As Range
+    Dim lastCol As Long
+    Dim rng As Range
+    
+    lastCol = Cells(1, Columns.Count).End(xlToLeft).Column
+    Set rng = Range(Cells(1, 10), Cells(1, lastCol))
+    For Each cell In rng
+        If IsDate(cell.Value) Then
+            cell.Value = DateValue(cell.Value)
+        End If
+    Next cell
+End Sub
+
+
+
+Sub CreateChartOnNewSheet()
+    Dim chartSheet As Chart
+
+    ' Delete existing chart sheet if it exists
+    On Error Resume Next
+    Application.DisplayAlerts = False
+    ThisWorkbook.Sheets("ProductionChart").Delete
+    Application.DisplayAlerts = True
+    On Error GoTo 0
+
+    ' Add a new chart sheet
+    Set chartSheet = ThisWorkbook.Charts.Add
+    chartSheet.Name = "ProductionChart"
+    chartSheet.ChartType = xlLine
+
+    With chartSheet
+        .SeriesCollection.NewSeries
+        With .SeriesCollection(1)
+            .Name = "=""Production Over Time"""
+            .XValues = "='Plot'!ChartDates"
+            .Values = "='Plot'!ChartSums"
+        End With
+
+        .HasTitle = True
+        .ChartTitle.Text = "Production Over Time"
+        .Axes(xlCategory).HasTitle = True
+        .Axes(xlCategory).AxisTitle.Text = "Date"
+        .Axes(xlValue).HasTitle = True
+        .Axes(xlValue).AxisTitle.Text = "Cumulative Sum"
+    End With
+End Sub
+
+
+Sub CreateOrUpdateChart()
+    Dim ws As Worksheet
+    Dim chartObj As ChartObject
+
+    Set ws = ThisWorkbook.Sheets("Plot")
+
+    ' Delete existing chart if needed
+    If ws.ChartObjects.Count > 0 Then ws.ChartObjects(1).Delete
+
+    ' Add new chart
+    Set chartObj = ws.ChartObjects.Add(Left:=300, Width:=500, Top:=50, Height:=300)
+
+    With chartObj.Chart
+        .ChartType = xlLine
+
+        .SeriesCollection.NewSeries
+        .SeriesCollection(1).Name = "=""Production Over Time"""
+        .SeriesCollection(1).XValues = "='Plot'!ChartDates"
+        .SeriesCollection(1).Values = "='Plot'!ChartSums"
+
+        .HasTitle = True
+        .ChartTitle.Text = "Production Over Time"
+        .Axes(xlCategory).HasTitle = True
+        .Axes(xlCategory).AxisTitle.Text = "Date"
+        .Axes(xlValue).HasTitle = True
+        .Axes(xlValue).AxisTitle.Text = "Cumulative Sum"
+    End With
+End Sub
+
+
+With chartSheet
+    .ChartType = xlLine
+
+    ' Delete any auto-generated series
+    Do While .SeriesCollection.Count > 0
+        .SeriesCollection(1).Delete
+    Loop
+
+    ' Now add your custom series
+    .SeriesCollection.NewSeries
+    With .SeriesCollection(1)
+        .Name = "=""Production Over Time"""
+        .XValues = "='Plot'!ChartDates"
+        .Values = "='Plot'!ChartSums"
+    End With
+
+    ' Formatting
+    .HasTitle = True
+    .ChartTitle.Text = "Production Over Time"
+    .Axes(xlCategory).HasTitle = True
+    .Axes(xlCategory).AxisTitle.Text = "Date"
+    .Axes(xlValue).HasTitle = True
+    .Axes(xlValue).AxisTitle.Text = "Cumulative Sum"
+End With
+
+
+For i = 1 To dateRange.Columns.Count
+    colIndex = startingCol + (i - 1)
+    lastRow = ws.Cells(ws.Rows.Count, colIndex).End(xlUp).Row
+
+    Dim currentSum As Double
+    currentSum = 0
+
+    Dim r As Long
+    For r = 2 To lastRow
+        If IsNumeric(ws.Cells(r, colIndex).Value) Then
+            currentSum = currentSum + ws.Cells(r, colIndex).Value
+        End If
+    Next r
+
+    cumulativeSum = cumulativeSum + currentSum
+
+    resultArray(i, 1) = ws.Cells(1, colIndex).Value ' Date
+    resultArray(i, 2) = cumulativeSum               ' Cumulative Sum
+Next i
+
+'Data Labels Position Options
+xlLabelPositionCenter
+xlLabelPositionAbove
+xlLabelPositionBelow
+xlLabelPositionLeft
+xlLabelPositionRight
+xlLabelPositionOutsideEnd
+xlLabelPositionInsideEnd
+xlLabelPositionInsideBase
+
+Sub PopulateDateHeaders()
+    Dim ws As Worksheet
+    Set ws = ThisWorkbook.Sheets("Gantt")
+
+    Dim lastRow As Long
+    lastRow = ws.Cells(ws.Rows.Count, "D").End(xlUp).Row ' Start dates in column D
+
+    Dim earliestStart As Date
+    Dim latestFinish As Date
+    Dim i As Long
+
+    ' Initialize with first valid start date
+    earliestStart = ws.Cells(2, "D").Value
+    latestFinish = earliestStart
+
+    For i = 2 To lastRow
+        If IsDate(ws.Cells(i, "D").Value) And IsNumeric(ws.Cells(i, "C").Value) Then
+            Dim startDate As Date
+            Dim duration As Double
+            Dim finishDate As Date
+
+            startDate = ws.Cells(i, "D").Value
+            duration = ws.Cells(i, "C").Value
+            finishDate = startDate + (duration * 7 / 5)
+
+            If startDate < earliestStart Then earliestStart = startDate
+            If finishDate > latestFinish Then latestFinish = finishDate
+        End If
+    Next i
+
+    ' Write dates to row 1 starting at column J
+    Dim currentDate As Date
+    currentDate = earliestStart
+
+    Dim col As Long
+    col = 10 ' Column J
+
+    Do While currentDate <= latestFinish
+        ws.Cells(1, col).Value = currentDate
+        ws.Cells(1, col).NumberFormat = "mm/dd/yyyy"
+        currentDate = currentDate + 1
+        col = col + 1
+    Loop
+End Sub
+
+
+If ShowDataLabels Then
+    .ApplyDataLabels
+    .DataLabels.ShowValue = True
+    .DataLabels.NumberFormat = "0"
+    .DataLabels.Position = xlLabelPositionAbove
+    Dim lbl As DataLabel
+    For Each lbl In .DataLabels
+        lbl.Orientation = 45
+    Next lbl
+End If
+
+If ShowTrendline Then
+    .Trendlines.Add Type:=xlLinear, Forward:=0, Backward:=0, DisplayEquation:=True, DisplayRSquared:=False
+End If
+
+
+Private Sub UserForm_Initialize()
+    Dim dpiScale As Double
+    dpiScale = Application.Width / 1024 ' Assuming 1024 is your design baseline
+
+    ' Resize the form
+    Me.Width = Me.Width * dpiScale
+    Me.Height = Me.Height * dpiScale
+
+    ' Center the form
+    Me.Left = (Application.Width - Me.Width) / 2
+    Me.Top = (Application.Height - Me.Height) / 2
+
+    ' Resize controls
+    Dim ctrl As Control
+    For Each ctrl In Me.Controls
+        ctrl.Width = ctrl.Width * dpiScale
+        ctrl.Height = ctrl.Height * dpiScale
+        ctrl.Left = ctrl.Left * dpiScale
+        ctrl.Top = ctrl.Top * dpiScale
+        ctrl.Font.Size = ctrl.Font.Size * dpiScale
+    Next ctrl
+End Sub
+
+Sub SumValuesByDate()
+    Dim dateRange As Range
+    Dim resultArray() As Variant
+    Dim i As Long, colIndex As Long
+    Dim ws As Worksheet
+    Dim targetWS As Worksheet
+    Dim lastRow As Long
+    Dim cumulativeSum As Double
+    cumulativeSum = 0
+    Dim startingCol As Long
+    startingCol = 10 ' Column J
+
+    Set ws = ThisWorkbook.Sheets("Gantt")
+    Set dateRange = GetLastColumnRange()
+
+    If SheetExists("Plot") Then
+        Set targetWS = ThisWorkbook.Sheets("Plot")
+    Else
+        MsgBox "Sheet 'Plot' does not exist!"
+        Exit Sub
+    End If
+
+    ReDim resultArray(1 To dateRange.Columns.Count, 1 To 2)
+
+    ' Variables for stats
+    Dim maxVal As Double, minVal As Double, totalSum As Double
+    Dim maxDate As Variant, minDate As Variant
+    maxVal = -1E+308
+    minVal = 1E+308
+    totalSum = 0
+
+    For i = 1 To dateRange.Columns.Count
+        colIndex = startingCol + (i - 1)
+        lastRow = ws.Cells(ws.Rows.Count, colIndex).End(xlUp).Row
+
+        Dim currentSum As Double
+        currentSum = 0
+
+        Dim r As Long
+        For r = 2 To lastRow
+            If IsNumeric(ws.Cells(r, colIndex).Value) Then
+                currentSum = currentSum + ws.Cells(r, colIndex).Value
+            End If
+        Next r
+
+        cumulativeSum = cumulativeSum + currentSum
+        totalSum = totalSum + cumulativeSum
+
+        resultArray(i, 1) = ws.Cells(1, colIndex).Value ' Date
+        resultArray(i, 2) = cumulativeSum               ' Cumulative Sum
+
+        ' Track max and min
+        If cumulativeSum > maxVal Then
+            maxVal = cumulativeSum
+            maxDate = ws.Cells(1, colIndex).Value
+        End If
+
+        If cumulativeSum < minVal Then
+            minVal = cumulativeSum
+            minDate = ws.Cells(1, colIndex).Value
+        End If
+    Next i
+
+    ' Output result to Plot sheet starting at A2
+    targetWS.Range("A2:B" & targetWS.Cells(targetWS.Rows.Count, "A").End(xlUp).Row).ClearContents
+    targetWS.Range("A2").Resize(UBound(resultArray), 2).Value = resultArray
+
+    ' Write directly to TextBoxes on Sheet1
+    With ThisWorkbook.Sheets("Sheet1")
+        .AveBox.Text = Format(totalSum / dateRange.Columns.Count, "0.00")
+        .MaxBox.Text = maxVal
+        .MaxDate.Text = maxDate
+        .MinBox.Text = minVal
+        .MinDate.Text = minDate
+    End With
+End Sub
+
+
+Sub ClearFromJ2()
+    Dim ws As Worksheet
+    Dim lastCol As Long
+    Dim lastRow As Long
+
+    Set ws = ThisWorkbook.Sheets("Gantt")
+
+    With ws
+    
+        If IsEmpty(.Range("J1")) Then
+            MsgBox "J1 is empty — nothing to clear.", vbInformation
+            Exit Sub
+        End If
+
+        lastCol = .Cells(1, .Columns.Count).End(xlToLeft).Column
+        lastRow = .Cells(.Rows.Count, 8).End(xlUp).Row
+
+        If lastCol >= 10 And lastRow >= 1 Then
+            .Range(.Cells(1, 10), .Cells(lastRow, lastCol)).ClearContents
+        End If
+    End With
+End Sub
+
+Dim holidayRange As Range
+Set holidayRange = Worksheets("Holidays").Range("A2:A100") ' Adjust as needed
+For i = 2 To lastRow
+    If IsDate(ws.Cells(i, "D").Value) And IsNumeric(ws.Cells(i, "C").Value) Then
+        Dim startDate As Date
+        Dim duration As Double
+        Dim finishDate As Date
+        Dim holidayCount As Integer
+        Dim cell As Range
+        startDate = ws.Cells(i, "D").Value
+        duration = ws.Cells(i, "C").Value
+        finishDate = startDate + (duration * 7 / 5)
+
+        ' Count holidays between startDate and finishDate
+        holidayCount = 0
+        For Each cell In holidayRange
+            If IsDate(cell.Value) Then
+                If cell.Value >= startDate And cell.Value <= finishDate Then
+                    holidayCount = holidayCount + 1
+                End If
+            End If
+        Next cell
+
+
+
+
+        ' Extend finishDate by number of holidays
+        finishDate = finishDate + holidayCount
+
+        If startDate < earliestStart Then earliestStart = startDate
+        If finishDate > latestFinish Then latestFinish = finishDate
+    End If
+Next i
+
+
+holidayRange = Range("Holidays")
+isHoliday = Not IsError(Application.Match(currentDate, holidayRange, 0))
+If Not isHoliday Then
+            ' It's a working day and not a holiday
+            outputArray(i) = DistributionArray(workingDayCount)
+            workingDayCount = workingDayCount + 1
+        End If
+
+
+Dim holidayRange As Range
+Set holidayRange = Worksheets("Holidays").Range("A2:A100") ' Adjust as needed
+
+For i = 2 To lastRow
+    If IsDate(ws.Cells(i, "D").Value) And IsNumeric(ws.Cells(i, "C").Value) Then
+        Dim startDate As Date
+        Dim duration As Double
+        Dim finishDate As Date
+        Dim currentDate As Date
+        Dim holidayCount As Integer
+
+        startDate = ws.Cells(i, "D").Value
+        duration = ws.Cells(i, "C").Value
+        finishDate = startDate + (duration * 7 / 5)
+
+        ' Loop through each date from startDate to finishDate
+        holidayCount = 0
+        For currentDate = startDate To finishDate
+            If Not IsError(Application.Match(currentDate, holidayRange, 0)) Then
+                holidayCount = holidayCount + 1
+            End If
+        Next currentDate
+
+        ' Extend finishDate by number of holidays
+        finishDate = finishDate + holidayCount
+        If startDate < earliestStart Then earliestStart = startDate
+        If finishDate > latestFinish Then latestFinish = finishDate
+    End If
+Next i
+
+
+Sub GetTrendlineStats()
+    Dim ws As Worksheet
+    Set ws=ThisWorkbook.Sheets("Gantt")
+    
+    Dim xRange As Range,yRange As Range
+    Set xRange=ThisWorkbook.Sheets("Plot").Range("ChartDates")
+    Set yRange=ThisWorkbook.Sheets("Plot").Range("ChartSums")
+    
+    Dim stats As Variant
+    stats=WorksheetFunction.LinEst(yRange,xRange,True,True)
+    
+    Dim slope As Double,intercept As Double,rsq As Double
+    slope=stats(1,1)
+    intercept=stats(1,2)
+    rsq=stats(3,1)' Store in TextBoxes
+    
+    ws.OLEObjects("SlopeBox").Object.Text=slope
+    ws.OLEObjects("RSqBox").Object.Text=rsq
+End Sub
+
+
+# For running code based on the checkbox
+Sub RunIfChecked()
+    If Sheet1.CheckBox1.Value = True Then
+        MsgBox "Checkbox is checked — running function!"
+        ' Call your function here
+    Else
+        MsgBox "Checkbox is not checked — skipping."
+    End If
+End Sub
+
+
+Sub CalculateStartAndFinish()Dim i As Long
+    Dim lastDate As Date
+    Dim lag As Long
+    Dim relationship As String
+    Dim relationshipType As String
+    Dim activityID As String
+    Dim startDate As Variant
+    Dim finishDate As Variant
+    Dim lastRow As Long
+
+    lastRow = Cells(Rows.Count,ColumnIndex("Activity ID")).End(xlUp).Row
+
+    For i=2 To lastRow ' Assuming row 1 is headers
+
+        finishDate = Cells(i,ColumnIndex("Finish")).Value
+        If IsEmpty(finishDate)Then
+            If Not IsEmpty(Cells(i,ColumnIndex("Start")).Value) And Not IsEmpty(Cells(i,ColumnIndex("Duration")).Value)Then
+                Cells(i,ColumnIndex("Finish")).Value = GetDateCustom(Cells(i,ColumnIndex("Start")).Value, Cells(i,ColumnIndex("Duration")).Value, Cells(i, ColumnIndex("Calendar")).Value)
+                lastDate = Cells(i,ColumnIndex("Finish")).Value
+            End If
+        Else
+            lastDate = finishDate
+        End If
+
+        relationship = Cells(i,ColumnIndex("With")).Value ' "Next" or activity ID
+        relationshipType = Cells(i,ColumnIndex("Relationship")).Value
+        lag = 0
+        If Not IsEmpty(Cells(i,ColumnIndex("Lag")).Value)Then
+            lag = Cells(i,ColumnIndex("Lag")).Value
+        End If
+
+        ' Assign start date if missing
+        If IsEmpty(Cells(i,ColumnIndex("Start")).Value)Then
+            If relationshipType="FS" Then
+                If relationship="Next" Then
+                    'This i need to add my Get
+                    Cells(i,ColumnIndex("Start")).Value = GetDateCustom(Cells(i-1,ColumnIndex("Finish")).Value, Cells(i,ColumnIndex("Lag")).Value, Cells(i, ColumnIndex("Calendar")).Value)
+
+                Else
+                    Cells(i,ColumnIndex("Start")).Value = GetDateCustom(IDDate(relationship)(1), Cells(i,ColumnIndex("Lag")).Value, Cells(i, ColumnIndex("Calendar")).Value)
+                    
+                End If
+            ElseIf relationshipType="SS" Then
+                If relationship="Next" Then
+                    Cells(i,ColumnIndex("Start")).Value = GetDateCustom(Cells(i-1,ColumnIndex("Start")).Value, Cells(i,ColumnIndex("Lag")).Value, Cells(i, ColumnIndex("Calendar")).Value)
+   
+                Else
+                    Cells(i,ColumnIndex("Start")).Value = GetDateCustom(IDDate(relationship)(0), Cells(i,ColumnIndex("Lag")).Value, Cells(i, ColumnIndex("Calendar")).Value)
+                    
+                End If
+            End If
+        End If
+    Next i
+End Sub
+
+Sub CalculateStartAndFinish()
+    Dim i As Long
+    Dim lastDate As Date
+    Dim lag As Long
+    Dim relationship As String
+    Dim relationshipType As String
+    Dim activityID As String
+    Dim startDate As Variant
+    Dim finishDate As Variant
+    Dim lastRow As Long
+
+    lastRow = Cells(Rows.Count, ColumnIndex("Activity ID")).End(xlUp).Row
+
+    For i = 2 To lastRow ' Assuming row 1 is headers
+
+        finishDate = Cells(i, ColumnIndex("Finish")).Value
+        If IsEmpty(finishDate) Then
+            If Not IsEmpty(Cells(i, ColumnIndex("Start")).Value) And Not IsEmpty(Cells(i, ColumnIndex("Duration")).Value) Then
+                Cells(i, ColumnIndex("Finish")).Value = GetDateCustom(Cells(i, ColumnIndex("Start")).Value, Cells(i, ColumnIndex("Duration")).Value, Cells(i, ColumnIndex("Calendar")).Value)
+                lastDate = Cells(i, ColumnIndex("Finish")).Value
+            End If
+        Else
+            lastDate = finishDate
+        End If
+
+        relationship = Cells(i, ColumnIndex("With")).Value ' "Next" or activity ID
+        relationshipType = Cells(i, ColumnIndex("Relationship")).Value
+        lag = 0
+        If Not IsEmpty(Cells(i, ColumnIndex("Lag")).Value) Then
+            lag = Cells(i, ColumnIndex("Lag")).Value
+        End If
+
+        ' Assign start date if missing
+        If IsEmpty(Cells(i, ColumnIndex("Start")).Value) Then
+            If relationshipType = "FS" Then
+                If relationship = "Next" Then
+                    'This i need to add my Get
+                    Cells(i, ColumnIndex("Start")).Value = GetDateCustom(Cells(i - 1, ColumnIndex("Finish")).Value, Cells(i, ColumnIndex("Lag")).Value, Cells(i, ColumnIndex("Calendar")).Value)
+
+                Else
+                    Cells(i, ColumnIndex("Start")).Value = GetDateCustom(IDFinishDate(relationship), Cells(i, ColumnIndex("Lag")).Value, Cells(i, ColumnIndex("Calendar")).Value)
+                    
+                End If
+            ElseIf relationshipType = "SS" Then
+                If relationship = "Next" Then
+                    Cells(i, ColumnIndex("Start")).Value = GetDateCustom(Cells(i - 1, ColumnIndex("Start")).Value, Cells(i, ColumnIndex("Lag")).Value, Cells(i, ColumnIndex("Calendar")).Value)
+   
+                Else
+                    Cells(i, ColumnIndex("Start")).Value = GetDateCustom(IDStartDate(relationship), Cells(i, ColumnIndex("Lag")).Value, Cells(i, ColumnIndex("Calendar")).Value)
+                    
+                End If
+            End If
+        End If
+    Next i
+End Sub
+
+
+
+
+Function IDStartDate(activityID As String) As Date
+    Dim rowIndex As Variant
+    Dim activityCol As Long
+    Dim lastRow As Long
+
+    activityCol = ColumnIndex("Activity ID")
+    lastRow = Cells(Rows.Count, activityCol).End(xlUp).Row
+
+    rowIndex = Application.Match(activityID, Range(Cells(2, activityCol), Cells(lastRow, activityCol)), 0)
+
+    If Not IsError(rowIndex) Then
+        rowIndex = rowIndex + 1 ' Adjust for header row
+        IDStartDate = CDate(Cells(rowIndex, ColumnIndex("Start")).Value)
+    Else
+        IDStartDate = 0 ' Or use CVDate("") to return an empty date
+    End If
+End Function
+
+Function IDFinishDate(activityID As String) As Date
+    Dim rowIndex As Variant
+    Dim activityCol As Long
+    Dim lastRow As Long
+
+    activityCol = ColumnIndex("Activity ID")
+    lastRow = Cells(Rows.Count, activityCol).End(xlUp).Row
+
+    rowIndex = Application.Match(activityID, Range(Cells(2, activityCol), Cells(lastRow, activityCol)), 0)
+
+    If Not IsError(rowIndex) Then
+        rowIndex = rowIndex + 1 ' Adjust for header row
+        IDFinishDate = CDate(Cells(rowIndex, ColumnIndex("Finish")).Value)
+    Else
+        IDFinishDate = 0
+    End If
+End Function
+
+
+Function GetDateCustom(Start As Date, duration As Double, Calendar As String) As Date
+    Dim workingDayCount As Long
+    Dim currentDate As Date
+    Dim currentDateIndex As Integer
+    Dim isHoliday As Boolean
+    Dim holidayRange As Range
+    Dim calendarWorkDays As Variant
+
+    currentDate = Start
+    holidayRange = Range("Holidays")
+    calendarWorkDays = GetColumn(Calendar)
+
+    workingDayCount = 0
+
+    ' Count working days based on calendar and holidays
+    Do While workingDayCount < duration
+        currentDateIndex = Weekday(currentDate, vbMonday) ' 1=Monday, 7=Sunday
+
+        If calendarWorkDays(currentDateIndex) = 1 Then
+            isHoliday = Not IsError(Application.Match(currentDate, holidayRange, 0))
+            
+            If Not isHoliday Then
+                workingDayCount = workingDayCount + 1
+            End If
+        End If
+        currentDate = currentDate + 1
+    Loop
+
+    ' Ensure the final date is also a valid working day
+    Do
+        currentDateIndex = Weekday(currentDate, vbMonday)
+
+        If calendarWorkDays(currentDateIndex) = 1 Then
+            isHoliday = Not IsError(Application.Match(currentDate, holidayRange, 0))
+            
+            If Not isHoliday Then
+                Exit Do
+            End If
+        End If
+        currentDate = currentDate + 1
+    Loop
+
+    GetDateCustom = currentDate
+End Function
+
+
+Function SumByDistributions(Distribution As String, duration As Long) As Variant
+    Dim outputArray() As Double
+    Dim inputArray() As Double
+    Dim i As Long, lowerIndex As Long, upperIndex As Long
+    Dim weightLower As Double, weightUpper As Double
+    Dim pos As Double
+
+    inputArray = GetColumn(Distribution)
+    ReDim outputArray(0 To duration - 1)
+
+    For i = 0 To 99 ' Always 100 input values
+        ' Map input index to fractional output index
+        pos = i * duration / 100
+        
+        lowerIndex = Int(pos)
+        upperIndex = lowerIndex + 1
+        weightUpper = pos - lowerIndex
+        weightLower = 1 - weightUpper
+
+        If lowerIndex >= 0 And lowerIndex < duration Then
+            outputArray(lowerIndex) = outputArray(lowerIndex) + inputArray(i) * weightLower
+        End If
+        If upperIndex >= 0 And upperIndex < duration Then
+            outputArray(upperIndex) = outputArray(upperIndex) + inputArray(i) * weightUpper
+        End If
+    Next i
+
+    SumByDistributions = outputArray
+End Function
+
+
+Function SumByDistributions(Distribution As String, duration As Double) As Variant
+    Dim outputArray() As Double
+    Dim i As Long
+    Dim groupSum As Double
+    Dim inputArray() As Double
+    inputArray = GetColumn(Distribution)
+    Dim distributionAmount As Double
+    distributionAmount = 100 / duration
+    Dim inputArrayIndex As Long
+
+    ReDim outputArray(0 To duration - 1)
+    if duration < 100 Then
+        For i = 0 To Duration - 1
+        groupSum = 0
+            For j = 1 To Duration
+                groupSum = groupSum + inputArray(i * Duration + j)
+            Next j
+        outputArray(i) = groupSum
+    Next i
+    End If
+
+    Else
+        groupSum = 0
+        For i = 0 To duration - 1
+            inputArrayIndex = round(i * distributionAmount)
+            groupSum = groupSum + inputArray(inputArrayIndex)
+        outputArray(i) = groupSum
+        Next i
+
+    Debug.Print "Sum By Dist " & LBound(outputArray) & "; " & UBound(outputArray)
+
+    SumByDistributions = outputArray
+End Function
+
+
+Function SumByDistributions(Distribution As String, duration As Double) As Variant
+    Dim outputArray() As Double
+    Dim inputArray() As Double
+    Dim i As Long, lowerIndex As Long, upperIndex As Long
+    Dim weightLower As Double, weightUpper As Double
+    Dim pos As Double
+
+    inputArray = GetColumn(Distribution)
+    ReDim outputArray(0 To duration - 1)
+
+    For i = 0 To 99 ' Always 100 input values
+        ' Map input index to fractional output index
+        pos = i * duration / 100
+        
+        lowerIndex = Int(pos)
+        upperIndex = lowerIndex + 1
+        weightUpper = pos - lowerIndex
+        weightLower = 1 - weightUpper
+
+        If lowerIndex >= 0 And lowerIndex < duration Then
+            outputArray(lowerIndex) = outputArray(lowerIndex) + inputArray(i) * weightLower
+        End If
+        If upperIndex >= 0 And upperIndex < duration Then
+            outputArray(upperIndex) = outputArray(upperIndex) + inputArray(i) * weightUpper
+        End If
+    Next i
+
+    SumByDistributions = outputArray
+End Function
+
+Function SumByDistributions(Distribution As String,duration As Double)As Variant
+    Dim outputArray()As Double
+    Dim inputArray()As Double
+    Dim i As Long,j As Long
+    Dim groupSum As Double
+    Dim inputArrayIndex As Long
+    Dim distributionAmount As Double
+
+    ' Get the input data
+    inputArray = GetColumn(Distribution)' Calculate how many groups we need
+    distributionAmount = (UBound(inputArray) + 1)/duration
+    ReDim outputArray(0 To duration - 1)' Sum values in groups
+    
+    For i = 0 To duration - 1
+        groupSum = 0 
+        For j = 0 To duration - 1
+            inputArrayIndex = i * duration + j
+            If inputArrayIndex <= distributionAmount Then
+                groupSum = groupSum + inputArray(inputArrayIndex)
+            End If
+        Next j
+        outputArray(i) = groupSum
+    Next i
+
+    ' Output to debug and return
+    Debug.Print "Sum By Dist " & LBound(outputArray)& "; " & UBound(outputArray)SumByDistributions=outputArray
+
+End Function
+
+
+Function SumByDistributions(Distribution As String,duration As Double)As Variant
+    Dim outputArray()As Double
+    Dim inputArray()As Double
+    Dim i As Long,j As Long
+    Dim groupSum As Double
+    Dim inputArrayIndex As Long
+    Dim numGroups As Long
+
+    ' Get the input data
+    inputArray=GetColumn(Distribution)' Calculate number of groups
+    numGroups=WorksheetFunction.RoundUp((UBound(inputArray)+1)/duration,0)ReDim outputArray(0 To numGroups-1)' Loop through each group
+    For i=0 To numGroups-1
+        groupSum=0
+        For j=0 To duration-1
+            inputArrayIndex=i*duration+j
+            If inputArrayIndex <=UBound(inputArray)Then
+                groupSum=groupSum+inputArray(inputArrayIndex)End If
+        Next j
+        outputArray(i)=groupSum
+    Next i
+
+    ' Output to debug and return
+    Debug.Print "Sum By Dist " & LBound(outputArray)& "; " & UBound(outputArray)SumByDistributions=outputArray
+
+    ' Optional: write to worksheet
+    Dim ws As Worksheet
+    Set ws=ThisWorkbook.Sheets("Sheet1")' Change as needed
+
+    For i=LBound(outputArray)To UBound(outputArray)ws.Cells(i+1,1).Value=outputArray(i)' Writes to column A
+    Next i
+End Function
+
+
+Function GetDateCustom(Start As Date, duration As Double, Calendar As String) As Date
+    Dim workingDayCount As Long
+    Dim currentDate As Date
+    Dim currentDateIndex As Integer
+    Dim isHoliday As Boolean
+    Dim calendarWorkDays As Variant
+
+    currentDate = Start
+    holidayRange = Range("Holidays")
+    calendarWorkDays = GetColumn(Calendar)
+    workingDayCount = 0
+    ' Count working days based on calendar and holidays
+    Do While workingDayCount < duration
+        currentDateIndex = Weekday(currentDate, vbMonday) - 1 ' 1=Monday, 7=Sunday
+        If calendarWorkDays(currentDateIndex) = 1 Then
+            isHoliday = Not IsError(Application.Match(currentDate, holidayRange, 0))
+            If Not isHoliday Then
+                workingDayCount = workingDayCount + 1
+            End If
+        End If
+        currentDate = currentDate + 1
+    Loop
+    ' Ensure the final date is also a valid working day
+    Do
+        currentDateIndex = Weekday(currentDate, vbMonday) - 1
+        If calendarWorkDays(currentDateIndex) = 1 Then
+            isHoliday = Not IsError(Application.Match(currentDate + 1, holidayRange, 0))
+            
+            If Not isHoliday Then
+                Exit Do
+            End If
+        End If
+        currentDate = currentDate + 1
+    Loop
+
+    GetDateCustom = currentDate
+End Function
+
+Function CalculateStartAndFinish(flag As Boolean) As Boolean
+    Dim i As Long
+    Dim lag As Long
+    Dim relationship As String
+    Dim relationshipType As String
+    Dim activityID As String
+    Dim lastRow As Long
+    Dim calculateStart As Boolean
+
+    calculateStart = (Worksheets("Gantt").RelationBox.Value = True)
+    lastRow = Cells(Rows.Count, ColumnIndex("Activity ID")).End(xlUp).Row
+    CalculateStartAndFinish = True
+
+    ' Ensure first activity has a start date
+    If IsEmpty(Cells(2, ColumnIndex("Start")).Value) Then
+        Cells(2, ColumnIndex("Start")).Interior.Color = RGB(255, 200, 200)
+        MsgBox "Invalid data for Activity ID: " & Cells(2, ColumnIndex("Activity ID")).Value & ". Initial Start date required.", vbExclamation
+        CalculateStartAndFinish = False
+        Exit Function
+    End If
+
+    For i = 2 To lastRow
+        activityID = Cells(i, ColumnIndex("Activity ID")).Value
+
+        ' Validate Duration
+        If IsEmpty(Cells(i, ColumnIndex("Duration")).Value) Then
+            Cells(i, ColumnIndex("Duration")).Interior.Color = RGB(255, 200, 200)
+            MsgBox "Invalid data for Activity ID: " & activityID & ". Activity duration required.", vbExclamation
+            CalculateStartAndFinish = False
+            Exit Function
+        End If
+
+        ' Validate Resource
+        If IsEmpty(Cells(i, ColumnIndex("Resource")).Value) Then
+            Cells(i, ColumnIndex("Resource")).Interior.Color = RGB(255, 200, 200)
+            MsgBox "Invalid data for Activity ID: " & activityID & ". Resources required.", vbExclamation
+            CalculateStartAndFinish = False
+            Exit Function
+        End If
+
+        If calculateStart Then
+            ' Relationship Type
+            If Not IsEmpty(Cells(i, ColumnIndex("Relationship")).Value) Then
+                relationshipType = Cells(i, ColumnIndex("Relationship")).Value
+            Else
+                Cells(i, ColumnIndex("Relationship")).Value = "FS"
+                relationshipType = "FS"
+            End If
+
+            ' Relationship Target
+            If Not IsEmpty(Cells(i, ColumnIndex("With")).Value) Then
+                relationship = Cells(i, ColumnIndex("With")).Value
+            Else
+                Cells(i, ColumnIndex("With")).Value = "Prev"
+                relationship = "Prev"
+            End If
+
+            ' Lag
+            If Not IsEmpty(Cells(i, ColumnIndex("Lag")).Value) Then
+                lag = Cells(i, ColumnIndex("Lag")).Value
+            Else
+                Cells(i, ColumnIndex("Lag")).Value = 0
+                lag = 0
+            End If
+
+            ' Calculate Start
+            If IsEmpty(Cells(i, ColumnIndex("Start")).Value) Then
+                If relationshipType = "FS" Then
+                    If relationship = "Prev" Then
+                        Cells(i, ColumnIndex("Start")).Value = GetDateCustom(Cells(i - 1, ColumnIndex("Finish")).Value, lag, Cells(i, ColumnIndex("Calendar")).Value)
+                    Else
+                        Cells(i, ColumnIndex("Start")).Value = GetDateCustom(IDFinishDate(relationship), lag, Cells(i, ColumnIndex("Calendar")).Value)
+                    End If
+                ElseIf relationshipType = "SS" Then
+                    If relationship = "Prev" Then
+                        Cells(i, ColumnIndex("Start")).Value = GetDateCustom(Cells(i - 1, ColumnIndex("Start")).Value, lag, Cells(i, ColumnIndex("Calendar")).Value)
+                    Else
+                        Cells(i, ColumnIndex("Start")).Value = GetDateCustom(IDStartDate(relationship), lag, Cells(i, ColumnIndex("Calendar")).Value)
+                    End If
+                End If
+            End If
+        End If
+
+        ' Calculate Finish
+        If IsEmpty(Cells(i, ColumnIndex("Start")).Value) Or IsEmpty(Cells(i, ColumnIndex("Duration")).Value) Then
+            Cells(i, ColumnIndex("Duration")).Interior.Color = RGB(255, 200, 200)
+            Cells(i, ColumnIndex("Start")).Interior.Color = RGB(255, 200, 200)
+            MsgBox "Invalid data for Activity ID: " & activityID & ". Start or Duration is empty.", vbExclamation
+            CalculateStartAndFinish = False
+            Exit Function
+        Else
+            Cells(i, ColumnIndex("Finish")).Value = GetDateCustom(Cells(i, ColumnIndex("Start")).Value, Cells(i, ColumnIndex("Duration")).Value, Cells(i, ColumnIndex("Calendar")).Value)
+        End If
+    Next i
+End Function
+
+
+            ' Calculate Start
+            If IsEmpty(Cells(i, ColumnIndex("Start")).Value) Then
+                If relationshipType = "FS" Then
+                    If relationship = "Prev" Then
+                        Cells(i, ColumnIndex("Start")).Value = GetDateCustom(Cells(i - 1, ColumnIndex("Finish")).Value, Cells(i, ColumnIndex("Lag")).Value, Cells(i, ColumnIndex("Calendar")).Value)
+                    Else
+                        Cells(i, ColumnIndex("Start")).Value = GetDateCustom(IDFinishDate(relationship), Cells(i, ColumnIndex("Lag")).Value, Cells(i, ColumnIndex("Calendar")).Value)
+                    End If
+                ElseIf relationshipType = "SS" Then
+                    If relationship = "Prev" Then
+                        Cells(i, ColumnIndex("Start")).Value = GetDateCustom(Cells(i - 1, ColumnIndex("Start")).Value, Cells(i, ColumnIndex("Lag")).Value, Cells(i, ColumnIndex("Calendar")).Value)
+                    Else
+                        Cells(i, ColumnIndex("Start")).Value = GetDateCustom(IDStartDate(relationship), Cells(i, ColumnIndex("Lag")).Value, Cells(i, ColumnIndex("Calendar")).Value)
+                    End If
+                End If
+            End If
+
+
+
+' Find the next available column pair (X and Y)
+Dim lastUsedCol As Long
+lastUsedCol = targetWS.Cells(1, targetWS.Columns.Count).End(xlToLeft).Column
+
+' If the sheet is empty, start at column 1
+If Application.WorksheetFunction.CountA(targetWS.Rows(1)) = 0 Then
+    lastUsedCol = 0
+End If
+
+Dim xCol As Long, yCol As Long
+xCol = lastUsedCol + 1
+yCol = xCol + 1
+
+' Write X-axis (dates) and Y-axis (cumulative sums)
+targetWS.Cells(2, xCol).Resize(UBound(resultArray), 1).Value = Application.Index(resultArray, 0, 1)
+targetWS.Cells(2, yCol).Resize(UBound(resultArray), 1).Value = Application.Index(resultArray, 0, 2)
+
+' Optional: Add headers
+targetWS.Cells(1, xCol).Value = "Date"
+targetWS.Cells(1, yCol).Value = ws.Cells(2, ColumnIndex("Category")).Value
+
+Sub SumValuesByDate(ByVal appendNew As Boolean)
+    ' ... [your existing setup code] ...
+
+    ' Determine where to write the data
+    Dim lastUsedCol As Long
+    lastUsedCol = GetLastUsedColumnPair(targetWS)
+
+    Dim xCol As Long, yCol As Long
+    If appendNew Then
+        xCol = lastUsedCol + 2
+    Else
+        xCol = lastUsedCol
+    End If
+    yCol = xCol + 1
+
+    ' Write X-axis (dates) and Y-axis (cumulative sums)
+    targetWS.Cells(2, xCol).Resize(UBound(resultArray), 1).Value = Application.Index(resultArray, 0, 1)
+    targetWS.Cells(2, yCol).Resize(UBound(resultArray), 1).Value = Application.Index(resultArray, 0, 2)
+
+    ' Optional: Add headers
+    targetWS.Cells(1, xCol).Value = "Date"
+    targetWS.Cells(1, yCol).Value = ws.Cells(2, ColumnIndex("Category")).Value
+
+    ' ... [your existing stats-to-TextBoxes code] ...
+End Sub
+
+
+
+Dim outputCol As Long
+outputCol = currentRow - 1 ' Assuming row 2 corresponds to column B (i.e., col 2)
+
+For i = LBound(resultArray) To UBound(resultArray)
+    ' Write horizontally in the main sheet
+    Cells(currentRow, startingCol + i).Value = resultArray(i)
+
+    ' Write vertically in the output sheet, advancing columns for each currentRow
+    outputSheet.Cells(i + 2, 1).Value = startDate + i ' Dates in column A
+    outputSheet.Cells(i + 2, outputCol).Value = resultArray(i) ' Values in column B, C, D...
+Next i
+
+Dim outputCol As Long
+outputCol = currentRow - 1 ' Column B = 2 when currentRow = 2
+
+For i = LBound(resultArray) To UBound(resultArray)
+    ' Write horizontally in the main sheet
+    Cells(currentRow, startingCol + i).Value = resultArray(i)
+
+    ' Write vertically in Export sheet, starting at row = startingCol + i
+    outputSheet.Cells(startingCol + i, 1).Value = startDate + i ' Dates in column A
+    outputSheet.Cells(startingCol + i, outputCol).Value = resultArray(i) ' Values in column B, C, D...
+Next i
+
+
+Dim outputSheet As Worksheet
+Set outputSheet = ThisWorkbook.Sheets("Output") ' Change to your actual sheet name
+
+Dim outputRow As Long
+outputRow = 14 ' Start writing from row 14
+
+' Ensure the first row in Column A is the StartDate
+outputSheet.Cells(outputRow, 1).Value = startDate
+outputSheet.Cells(outputRow, 2).Value = resultArray(0)
+outputRow = outputRow + 1
+
+' Write the rest of the resultArray starting from index 1
+Dim i As Long
+For i = 1 To UBound(resultArray)
+    outputSheet.Cells(outputRow, 1).Value = startDate + i
+    outputSheet.Cells(outputRow, 2).Value = resultArray(i)
+    outputRow = outputRow + 1
+Next i
+
+Dim outputSheet As Worksheet
+Set outputSheet = ThisWorkbook.Sheets("Output") ' Change to your actual sheet name
+
+Dim outputRow As Long
+outputRow = 14 ' Start writing from row 14
+
+' Use currentCell.Row to identify the source row
+If IsDate(startDate) Then
+    For i = LBound(resultArray) To UBound(resultArray)
+        outputSheet.Cells(outputRow, 1).Value = startDate + i
+        outputSheet.Cells(outputRow, 2).Value = resultArray(i)
+        outputSheet.Cells(outputRow, 3).Value = currentCell.Row ' Optional: track source row
+        outputRow = outputRow + 1
+    Next i
+End If
+
+
+Dim actualDate As Variant
+Dim previousDate As Date
+
+For i = LBound(resultArray) To UBound(resultArray)
+    actualDate = Cells(1, startingCol + i).Value
+
+    If IsDate(actualDate) Then
+        previousDate = actualDate
+    Else
+        previousDate = previousDate + 1
+        actualDate = previousDate
+    End If
+
+    ' Write the date to Column A in the output sheet
+    outputSheet.Cells(i + 2, 1).Value = actualDate
+
+    ' Write the activity name as header
+    outputSheet.Cells(1, outputCol).Value = Cells(currentRow, ColumnIndex("Activity Description")).Value
+
+    ' Write the result value aligned with the actual date
+    outputSheet.Cells(i + 2, outputCol).Value = resultArray(i)
+Next i
+
+
+Dim i As Long
+Dim outputSheet As Worksheet
+Set outputSheet=ThisWorkbook.Sheets("Export")Dim exportRow As Long
+Dim outputActivityDescCol As Long
+Dim outputDateCol As Long
+Dim outputDataCol As Long
+
+exportRow=startingCol-12 ' Adjust for header row in Export sheet
+outputActivityDescCol=1 ' First thing in Export sheet
+outputDateCol=outputActivityDescCol+1 ' After the Activity Description in Export sheet
+outputDataCol=outputDateCol+1 ' After the Date in Export sheet
+
+Dim activityName As String
+Dim activityParts()As String
+Dim j As Long
+
+For i=LBound(resultArray)To UBound(resultArray)
+    Cells(currentRow,startingCol+i).Value=resultArray(i)' Get the activity name and split it
+    activityName=Cells(currentRow,ColumnIndex("Activity Description")).Value
+    activityParts=Split(activityName,",")' Write each part into separate columns starting at outputActivityDescCol
+    For j=LBound(activityParts) To UBound(activityParts)
+        outputSheet.Cells(exportRow+i,outputActivityDescCol+j).Value=Trim(activityParts(j))
+    Next j
+
+    ' Write the date value
+    outputSheet.Cells(exportRow+i,outputDateCol+UBound(activityParts)+1).Value=resultArray(i)
+Next i
+
+
+Function GetColumnsBeforeDuration(ColumnIndex As Scripting.Dictionary) As Collection
+    Dim colName As Variant
+    Dim result As New Collection
+    
+    For Each colName In ColumnIndex.Keys
+        If colName = "Duration" Then Exit For
+        result.Add colName
+    Next colName
+    
+    Set GetColumnsBeforeDuration = result
+End Function
+
+
+
+Sub BuildColumnIndex(ColumnNames As Variant, ColumnIndex As Scripting.Dictionary)
+    Dim i As Long
+    ColumnIndex.RemoveAll ' Clear existing entries
+    
+    For i = LBound(ColumnNames) To UBound(ColumnNames)
+        ColumnIndex.Add ColumnNames(i), i + 1 ' VBA is 1-based for Excel columns
+    Next i
+End Sub
+
+
+Sub InitializeColumnIndex()
+    Dim ws As Worksheet
+    Dim ColumnNames()As Variant
+    Dim ColumnIndex As Scripting.Dictionary
+    Dim i As Long,LastCol As Long
+    
+    Set ws=ThisWorkbook.Sheets("Sheet1")' Change to your sheet name
+    Set ColumnIndex = New Scripting.Dictionary
+    
+    ' Find the last column before "Error"
+    i=1
+    Do While ws.Cells(1,i).Value <> "Error" And ws.Cells(1,i).Value <> ""
+        i=i+1
+    Loop
+    LastCol=i-1
+    
+    ' Resize and populate ColumnNames array
+    ReDim ColumnNames(0 To LastCol-1)For i=0 To LastCol-1
+        ColumnNames(i)=ws.Cells(1,i+1).Value
+    Next i
+    
+    ' Build the index
+    BuildColumnIndex ColumnNames,ColumnIndex
+    
+    ' Optional: Print the dictionary to Immediate Window
+    Dim key As Variant
+    For Each key In ColumnIndex.Keys
+        Debug.Print key & "-> " & ColumnIndex(key)Next key
+End Sub
+
+'OLD
+Sub InitializeColumnIndex()
+    Set ColumnIndex = New Scripting.Dictionary
+
+    ' Manually map headers to column numbers (A = 1, B = 2, ..., L = 12)
+    ColumnIndex.Add "Activity ID", 1
+    ColumnIndex.Add "Category", 2
+    ColumnIndex.Add "Activity Description", 3
+    ColumnIndex.Add "Duration", 4
+    ColumnIndex.Add "Start", 5
+    ColumnIndex.Add "Finish", 6
+    ColumnIndex.Add "Relationship", 7
+    ColumnIndex.Add "With", 8
+    ColumnIndex.Add "Lag", 9
+    ColumnIndex.Add "Resource", 10
+    ColumnIndex.Add "Distribution", 11
+    ColumnIndex.Add "Calendar", 12
+    ColumnIndex.Add "GanttStart", 14
+    
+    'ColumnIndex("Calendar")
+End Sub
+
+
+Dim key As Variant
+Dim outputKeys As Collection
+Set outputKeys = New Collection
+
+Dim startIndex As Long, endIndex As Long
+startIndex = ColumnIndex("Activity ID")
+endIndex = ColumnIndex("Duration")
+
+For Each key In ColumnIndex.Keys
+    If ColumnIndex(key)> startIndex And ColumnIndex(key)< endIndex Then
+        outputKeys.Add key
+    End If
+Next key
+
+
+Dim outputSheet As Worksheet
+Set outputSheet = ThisWorkbook.Sheets("Export")
+
+Dim i As Long
+For i=1 To outputKeys.Count
+    outputSheet.Cells(1,i).Value = outputKeys(i)
+Next i
+
+
+'OLD
+Dim activityName As String
+            Dim activityParts() As String
+            Dim j As Long
+
+            For i = LBound(resultArray) To UBound(resultArray)
+                Cells(currentRow, startingCol + i).Value = resultArray(i)
+
+                activityName = Cells(currentRow, ColumnIndex("Activity Description")).Value
+                activityNameHeader = Cells(1, ColumnIndex("Activity Description")).Value
+                activityParts = Split(activityName, ",") 
+                activityHeaderParts = Split(activityNameHeader, ",")
+
+                For j = LBound(activityParts) To UBound(activityParts)
+                    outputSheet.Cells(1, outputActivityDescCol + j).Value = Trim(activityHeaderParts(j))
+                    outputSheet.Cells(exportRow + i, outputActivityDescCol + j).Value = Trim(activityParts(j))
+                Next j
+
+                outputSheet.Cells(1, outputDateCol + UBound(activityParts)).Value = "Date"
+                outputSheet.Cells(1, outputDataCol + UBound(activityParts)).Value = "Resource"
+
+                outputSheet.Cells(exportRow + i, outputDateCol + UBound(activityParts)).Value = Cells(1, startingCol + i).Value
+                outputSheet.Cells(exportRow + i, outputDataCol + UBound(activityParts)).Value = resultArray(i)
+            Next i
+
+'OLD
+Sub WriteToCells()
+    Dim currentCell As Range
+    Dim distArray As Variant
+    Dim resultArray As Variant
+    Dim startingCol As Variant
+
+    Dim duration As Double
+    Dim startDate As Date
+    Dim finishDate As Date
+    Dim resource As Double
+    Dim distributionType As String
+    Dim calendarType As String
+    
+    'ActivateGanttSheet
+
+    ' Loop through non-empty cells in column A
+    For Each currentCell In Range("A2:A" & Cells(Rows.Count, 1).End(xlUp).Row)
+        If Not IsEmpty(currentCell.Value) Then
+            Dim currentRow As Long
+            currentRow = currentCell.Row
+
+            ' Get values from the same row
+            duration = Cells(currentRow, ColumnIndex("Duration")).Value
+            startDate = Cells(currentRow, ColumnIndex("Start")).Value
+            finishDate = Cells(currentRow, ColumnIndex("Finish")).Value
+            
+            resource = Cells(currentRow, ColumnIndex("Resource")).Value
+            distributionType = Cells(currentRow, ColumnIndex("Distribution")).Value
+            calendarType = Cells(currentRow, ColumnIndex("Calendar")).Value
+
+            ' Generate distribution and assign values
+            distArray = CreateDistributionArray(duration, resource, distributionType)
+            resultArray = AssignDistributionToDates(startDate, duration, distArray, calendarType)
+            startingCol = FindDateColumn(startDate)
+
+            ' Write resultArray to the row starting at startingCol
+            Dim i As Long
+            Dim outputSheet As Worksheet
+            Set outputSheet = ThisWorkbook.Sheets("Export")
+
+            Dim exportRow As Long
+            Dim outputActivityDescCol As Long
+            Dim outputDateCol As Long
+            Dim outputDataCol As Long
+
+            exportRow = startingCol - 12 ' Adjust for header row in Export sheet
+            outputActivityDescCol = 1 ' First thing in Export sheet
+            outputDateCol = outputActivityDescCol + 1 ' After the Activity Description in Export sheet
+            outputDataCol = outputDateCol + 1 ' After the Date in Export sheet
+
+            Dim activityName As String
+            Dim activityParts() As String
+            Dim j As Long
+
+            For i = LBound(resultArray) To UBound(resultArray)
+                Cells(currentRow, startingCol + i).Value = resultArray(i)
+
+                activityName = Cells(currentRow, ColumnIndex("Activity Description")).Value
+                activityNameHeader = Cells(1, ColumnIndex("Activity Description")).Value
+                activityParts = Split(activityName, ",")
+                activityHeaderParts = Split(activityNameHeader, ",")
+
+                For j = LBound(activityParts) To UBound(activityParts)
+                    outputSheet.Cells(1, outputActivityDescCol + j).Value = Trim(activityHeaderParts(j))
+                    outputSheet.Cells(exportRow + i, outputActivityDescCol + j).Value = Trim(activityParts(j))
+                Next j
+
+                outputSheet.Cells(1, outputDateCol + UBound(activityParts)).Value = "Date"
+                outputSheet.Cells(1, outputDataCol + UBound(activityParts)).Value = "Resource"
+
+                outputSheet.Cells(exportRow + i, outputDateCol + UBound(activityParts)).Value = Cells(1, startingCol + i).Value
+                outputSheet.Cells(exportRow + i, outputDataCol + UBound(activityParts)).Value = resultArray(i)
+            Next i
+        End If
+    Next currentCell
+End Sub
+
+
+Function SumByDistributions(Distribution As String, duration As Long) As Variant
+    Dim outputArray() As Double
+    Dim inputArray() As Double
+    Dim totalItems As Long
+    Dim baseGroupSize As Long
+    Dim remainder As Long
+    Dim startIndex As Long
+    Dim currentGroupSize As Long
+    Dim i As Long, j As Long
+    Dim groupSum As Double
+
+    ' Get the input data
+    inputArray = GetColumn(Distribution)
+    totalItems = UBound(inputArray) + 1
+    ' Calculate base group size and remainder
+    baseGroupSize = totalItems \ duration
+    remainder = totalItems Mod duration
+
+    ' Prepare output array
+    ReDim outputArray(0 To duration - 1)
+
+    startIndex = 0
+    For i = 0 To duration - 1
+        groupSum = 0
+        currentGroupSize = baseGroupSize
+        If i < remainder Then currentGroupSize = currentGroupSize + 1
+
+        For j = 0 To currentGroupSize - 1
+            groupSum = groupSum + inputArray(startIndex + j)
+        Next j
+
+        outputArray(i) = groupSum
+        startIndex = startIndex + currentGroupSize
+    Next i
+
+    SumByDistributions = outputArray
+End Function
+
+
+'This is a VBA macro to create a dynamic PivotChart with slicers based on a table of data in Excel. It sets up the necessary worksheets, creates a PivotTable, and adds slicers for each field in the data table. The chart is then created on a dashboard sheet.
+Sub CreatePivotChartWithDynamicSlicers()
+    Dim wsData As Worksheet, wsPivot As Worksheet, wsDash As Worksheet
+    Dim ptCache As PivotCache, pt As PivotTable
+    Dim tblRange As Range
+    Dim lastCol As Long, i As Long
+    Dim chartObj As ChartObject
+    Dim headerName As String
+
+    ' Set up sheets
+    Set wsData = ThisWorkbook.Sheets("ExportedData") ' Your macro-generated table
+    Set wsDash = ThisWorkbook.Sheets("Dashboard")
+    
+    ' Create or clear Pivot sheet
+    On Error Resume Next
+    Set wsPivot = ThisWorkbook.Sheets("PivotBackend")
+    If wsPivot Is Nothing Then
+        Set wsPivot = ThisWorkbook.Sheets.Add
+        wsPivot.Name = "PivotBackend"
+    Else
+        wsPivot.Cells.Clear
+    End If
+    wsPivot.Visible = xlSheetHidden
+    On Error GoTo 0
+
+    ' Define table range
+    Set tblRange = wsData.Range("A1").CurrentRegion
+    lastCol = tblRange.Columns.Count
+
+    ' Create PivotCache and PivotTable
+    Set ptCache = ThisWorkbook.PivotCaches.Create( _
+        SourceType:=xlDatabase, SourceData:=tblRange)
+    Set pt = ptCache.CreatePivotTable( _
+        TableDestination:=wsPivot.Range("A3"), TableName:="AutoPivot")
+
+    ' Add first column as RowField, second as Values (customize as needed)
+    pt.PivotFields(1).Orientation = xlRowField
+    pt.PivotFields(2).Orientation = xlDataField
+    pt.PivotFields(2).Function = xlSum
+
+    ' Create PivotChart
+    Set chartObj = wsDash.ChartObjects.Add(Left:=100, Width:=600, Top:=50, Height:=300)
+    chartObj.Chart.SetSourceData pt.TableRange2
+    chartObj.Chart.ChartType = xlColumnClustered
+    chartObj.Chart.HasTitle = True
+    chartObj.Chart.ChartTitle.Text = "Dynamic PivotChart"
+
+    ' Add slicers for each field
+    For i = 1 To lastCol
+        headerName = tblRange.Cells(1, i).Value
+        On Error Resume Next
+        ActiveWorkbook.SlicerCaches.Add(pt, headerName).Slicers.Add _
+            SlicerDestination:=wsDash, Name:=headerName, Caption:=headerName, Top:=400 + (i - 1) * 60, Left:=100
+        On Error GoTo 0
+    Next i
+
+    MsgBox "Dashboard created with dynamic slicers!", vbInformation
+End Sub
+
+
+Sub CreatePivotWithSlicersAndRunningTotal()
+    Dim wsData As Worksheet, wsPivot As Worksheet, wsDash As Worksheet
+    Dim ptCache As PivotCache, pt As PivotTable
+    Dim tblRange As Range
+    Dim lastCol As Long, i As Long
+    Dim headerName As String
+    Dim dateField As String
+
+    ' Set up sheets
+    Set wsData = ThisWorkbook.Sheets("export")
+    On Error Resume Next
+    Set wsPivot = ThisWorkbook.Sheets("PivotBackend")
+    If wsPivot Is Nothing Then
+        Set wsPivot = ThisWorkbook.Sheets.Add
+        wsPivot.Name = "PivotBackend"
+    Else
+        wsPivot.Cells.Clear
+    End If
+    wsPivot.Visible = xlSheetHidden
+    On Error GoTo 0
+
+    ' Create dashboard sheet
+    On Error Resume Next
+    Set wsDash = ThisWorkbook.Sheets("Dashboard")
+    If wsDash Is Nothing Then
+        Set wsDash = ThisWorkbook.Sheets.Add
+        wsDash.Name = "Dashboard"
+    Else
+        wsDash.Cells.Clear
+    End If
+    On Error GoTo 0
+
+    ' Define table range
+    Set tblRange = wsData.Range("A1").CurrentRegion
+    lastCol = tblRange.Columns.Count
+
+    
+' Create PivotCache and PivotTable
+    Set ptCache = ThisWorkbook.PivotCaches.Create( _
+        SourceType:=xlDatabase, SourceData:=tblRange)
+    Set pt = ptCache.CreatePivotTable( _
+        TableDestination:=wsPivot.Range("A3"), TableName:="AutoPivot")
+
+
+
+    ' Assume first column is Date
+    dateField = tblRange.Cells(1, 1).Value
+    With pt.PivotFields(dateField)
+        .Orientation = xlRowField
+        .Position = 1
+    End With
+
+    ' Add second column as DataField with running total
+    With pt.PivotFields(tblRange.Cells(1, 2).Value)
+        .Orientation = xlDataField
+        .Function = xlSum
+        .Calculation = xlRunningTotal
+        .BaseField = dateField
+    End With
+
+    ' Create PivotChart
+    Dim chartObj As ChartObject
+    Set chartObj = wsDash.ChartObjects.Add(Left:=100, Width:=600, Top:=50, Height:=300)
+    chartObj.Chart.SetSourceData pt.TableRange2
+    chartObj.Chart.ChartType = xlLine
+    chartObj.Chart.HasTitle = True
+    chartObj.Chart.ChartTitle.Text = "Running Total by Date"
+
+    ' Add slicers for all fields except the date
+    For i = 2 To lastCol
+        headerName = tblRange.Cells(1, i).Value
+        On Error Resume Next
+        ActiveWorkbook.SlicerCaches.Add(pt, headerName).Slicers.Add _
+            SlicerDestination:=wsDash, Name:=headerName, Caption:=headerName, _
+            Top:=400 + ((i - 2) * 60), Left:=100
+        On Error GoTo 0
+    Next i
+
+    MsgBox "Dashboard created with running total and slicers!", vbInformation
+
+
+Dim dateField As String, resourceField As String
+Dim colIndex As Long
+
+' Find "Date" and "Resource" headers in the export sheet
+For colIndex = 1 To lastCol
+    If tblRange.Cells(1, colIndex).Value = "Date" Then
+        dateField = tblRange.Cells(1, colIndex).Value
+    ElseIf tblRange.Cells(1, colIndex).Value = "Resource" Then
+        resourceField = tblRange.Cells(1, colIndex).Value
+    End If
+Next colIndex
+
+' Validate that both fields were found
+If dateField = "" Or resourceField = "" Then
+    MsgBox "Required fields 'Date' or 'Resource' not found in headers.", vbCritical
+    Exit Sub
+End If
+
+' Add Date as RowField
+With pt.PivotFields(dateField)
+    .Orientation = xlRowField
+    .Position = 1
+End With
+
+' Add Resource as DataField with Running Total
+With pt.PivotFields(resourceField)
+    .Orientation = xlDataField
+    .Function = xlSum
+    .Calculation = xlRunningTotal
+    .BaseField = dateField
+End With
+
+
+Sub BuildCleanPivotDashboard()
+    Dim wsData As Worksheet, wsPivot As Worksheet, wsDash As Worksheet
+    Dim ptCache As PivotCache, pt As PivotTable
+    Dim tblRange As Range
+    Dim lastCol As Long, i As Long
+    Dim headerName As String
+    Dim chartObj As ChartObject
+    Dim dateField As String
+    Dim colIndex As Long
+    Dim uniqueCount As Long
+
+    ' Setup sheets
+    Set wsData = ThisWorkbook.Sheets("export")
+    On Error Resume Next
+    Set wsPivot = ThisWorkbook.Sheets("PivotBackend")
+    If wsPivot Is Nothing Then
+        Set wsPivot = ThisWorkbook.Sheets.Add
+        wsPivot.Name = "PivotBackend"
+    Else
+        wsPivot.Cells.Clear
+    End If
+    wsPivot.Visible = xlSheetHidden
+    On Error GoTo 0
+
+    On Error Resume Next
+    Set wsDash = ThisWorkbook.Sheets("Dashboard")
+    If wsDash Is Nothing Then
+        Set wsDash = ThisWorkbook.Sheets.Add
+        wsDash.Name = "Dashboard"
+    Else
+        wsDash.Cells.Clear
+    End If
+    On Error GoTo 0
+
+    ' Delete existing charts
+    For Each chartObj In wsDash.ChartObjects
+        chartObj.Delete
+    Next chartObj
+
+    ' Define table range
+    Set tblRange = wsData.Range("A1").CurrentRegion
+    lastCol = tblRange.Columns.Count
+
+    ' Find "Date" column
+    For colIndex = 1 To lastCol
+        If tblRange.Cells(1, colIndex).Value = "Date" Then
+            dateField = tblRange.Cells(1, colIndex).Value
+            Exit For
+        End If
+    Next colIndex
+
+    If dateField = "" Then
+        MsgBox "'Date' column not found.", vbCritical
+        Exit Sub
+    End If
+
+    ' Create PivotCache and PivotTable
+    Set ptCache = ThisWorkbook.PivotCaches.Create( _
+        SourceType:=xlDatabase, SourceData:=tblRange)
+    Set pt = ptCache.CreatePivotTable( _
+        TableDestination:=wsPivot.Range("A3"), TableName:="AutoPivot")
+
+    ' Add Date as RowField
+    With pt.PivotFields(dateField)
+        .Orientation = xlRowField
+        .Position = 1
+    End With
+
+    ' Add "Resource" as DataField with Running Total
+    For colIndex = 1 To lastCol
+        If tblRange.Cells(1, colIndex).Value = "Resource" Then
+            With pt.PivotFields("Resource")
+                .Orientation = xlDataField
+                .Function = xlSum
+                .Calculation = xlRunningTotal
+                .BaseField = dateField
+            End With
+            Exit For
+        End If
+    Next colIndex
+
+    ' Create PivotChart
+    Set chartObj = wsDash.ChartObjects.Add(Left:=100, Width:=600, Top:=50, Height:=300)
+    chartObj.Name = "PivotChart"
+    chartObj.Chart.SetSourceData pt.TableRange2
+    chartObj.Chart.ChartType = xlLine
+    chartObj.Chart.ChartStyle = 4
+    chartObj.Chart.HasTitle = True
+    chartObj.Chart.ChartTitle.Text = "Running Total by Date"
+
+    ' Add slicers for fields with multiple unique values
+    For i = 1 To lastCol
+        headerName = tblRange.Cells(1, i).Value
+        If headerName <> "Date" And headerName <> "Resource" Then
+            uniqueCount = WorksheetFunction.CountA(wsData.Range(wsData.Cells(2, i), wsData.Cells(wsData.Rows.Count, i)))
+            If uniqueCount > 1 Then
+                On Error Resume Next
+                ActiveWorkbook.SlicerCaches.Add(pt, headerName).Slicers.Add _
+                    SlicerDestination:=wsDash, Name:=headerName, Caption:=headerName, _
+                    Top:=50 + ((i - 1) * 60), Left:=750
+                On Error GoTo 0
+            End If
+        End If
+    Next i
+
+    ' Add timeline slicer for Date
+    On Error Resume Next
+    ActiveWorkbook.SlicerCaches.Add(pt, dateField).Timeline.Add _
+        SlicerDestination:=wsDash, Name:="DateTimeline", Caption:="Date", _
+        Top:=50, Left:=750 + 200
+    On Error GoTo 0
+End Sub
+
+' Add all fields as PageFields (filters) so slicers can be created
+For i = 1 To lastCol
+    headerName = tblRange.Cells(1, i).Value
+    If headerName <> "Date" And headerName <> "Resource" Then
+        With pt.PivotFields(headerName)
+            .Orientation = xlPageField
+        End With
+
+        ' Now add slicer for this field
+        On Error Resume Next
+        ActiveWorkbook.SlicerCaches.Add(pt, headerName).Slicers.Add _
+            SlicerDestination:=wsDash, Name:=headerName, Caption:=headerName, _
+            Top:=50 + ((i - 1) * 60), Left:=750
+        On Error GoTo 0
+    End If
+Next i
+
+
+Sub Macro1()
+
+    ActiveSheet.ChartObjects("PivotChart").Activate
+    ActiveWorkbook.SlicerCaches.Add2(ActiveSheet.PivotTables("AutoPivot"), "Date", _
+        , xlTimeline).Slicers.Add ActiveSheet, , "Date", "Date", 230.25, 473.25, 262.5 _, 108
+
+    ActiveSheet.Shapes.Range(Array("Date")).Select
+    
+       
+    ActiveWorkbook.SlicerCaches.Add2(ActiveSheet.PivotTables("AutoPivot"), _
+        "Activity").Slicers.Add ActiveSheet, , "Activity", "Activity", 22.35, 345, _
+        143.85, 207.75
+    
+    ActiveWorkbook.SlicerCaches.Add2(ActiveSheet.PivotTables("AutoPivot"), "Type"). _
+        Slicers.Add ActiveSheet, , "Type", "Type", 116.1, 438.6, 144.15, 207.9
+    
+    ActiveWorkbook.SlicerCaches.Add2(ActiveSheet.PivotTables("AutoPivot"), "Level") _
+        .Slicers.Add ActiveSheet, , "Level", "Level", 210, 532.5, 143.85, 207.75
+    
+    ActiveWorkbook.SlicerCaches.Add2(ActiveSheet.PivotTables("AutoPivot"), _
+        "Description").Slicers.Add ActiveSheet, , "Description", "Description", 303.75 _
+        , 626.1, 144.15, 207.6
+    ActiveWorkbook.SlicerCaches.Add2(ActiveSheet.PivotTables("AutoPivot"), _
+        "Resource").Slicers.Add ActiveSheet, , "Resource", "Resource", 397.35, 720, _
+        143.85, 207.75
+    ActiveSheet.Shapes.Range(Array("Resource")).Select
+End Sub
+
+
+Sub CreatePivotChartWithSlicerPanel()
+    Dim wsData As Worksheet, wsPivot As Worksheet, wsDash As Worksheet
+    Dim ptCache As PivotCache, pt As PivotTable
+    Dim tblRange As Range
+    Dim lastCol As Long, i As Long
+    Dim chartObj As ChartObject
+    Dim headerName As String
+    Dim dateField As String, resourceField As String
+    Dim colIndex As Long
+    Dim slicerTop As Long
+    Dim timelineCache As SlicerCache
+    Dim timelineSlicer As Slicer
+
+    ' Set up sheets
+    Set wsData = ThisWorkbook.Sheets("Export")
+    Set wsDash = ThisWorkbook.Sheets("Dashboard")
+
+    ' Create or clear Pivot sheet
+    On Error Resume Next
+    Set wsPivot = ThisWorkbook.Sheets("Pivot")
+    If wsPivot Is Nothing Then
+        Set wsPivot = ThisWorkbook.Sheets.Add
+        wsPivot.Name = "Pivot"
+    Else
+        wsPivot.Cells.Clear
+    End If
+    wsPivot.Visible = xlSheetVisible
+    On Error GoTo 0
+
+    ' Delete existing charts
+    For Each chartObj In wsDash.ChartObjects
+        chartObj.Delete
+    Next chartObj
+
+    ' Define table range
+    Set tblRange = wsData.Range("A1").CurrentRegion
+    lastCol = tblRange.Columns.Count
+
+    ' Create PivotCache and PivotTable
+    Set ptCache = ThisWorkbook.PivotCaches.Create( _
+        SourceType:=xlDatabase, SourceData:=tblRange)
+    Set pt = ptCache.CreatePivotTable( _
+        TableDestination:=wsPivot.Range("A3"), TableName:="AutoPivot")
+
+    ' Find "Date" and "Resource" headers
+    For colIndex = 1 To lastCol
+        Select Case tblRange.Cells(1, colIndex).Value
+            Case "Date": dateField = "Date"
+            Case "Resource": resourceField = "Resource"
+        End Select
+    Next colIndex
+
+    If dateField = "" Or resourceField = "" Then
+        MsgBox "Required fields 'Date' or 'Resource' not found.", vbCritical
+        Exit Sub
+    End If
+
+    ' Add fields to PivotTable
+    With pt.PivotFields(dateField)
+        .Orientation = xlRowField
+        .Position = 1
+    End With
+
+    With pt.PivotFields(resourceField)
+        .Orientation = xlDataField
+        .Function = xlSum
+        .Calculation = xlRunningTotal
+        .BaseField = dateField
+    End With
+
+    ' Create PivotChart on the left
+    Set chartObj = wsDash.ChartObjects.Add(Left:=50, Width:=700, Top:=50, Height:=450)
+    chartObj.Name = "PivotChart"
+    chartObj.Chart.SetSourceData pt.TableRange2
+    chartObj.Chart.ChartType = xlLine
+    chartObj.Chart.ChartStyle = 230
+    chartObj.Chart.HasTitle = True
+    chartObj.Chart.ChartTitle.Text = "Production Over Time"
+
+    ' Create slicer panel to the right of the chart
+    slicerTop = 50
+    Dim slicerLeft As Long
+    slicerLeft = chartObj.Left + chartObj.Width + 50 ' Panel starts to the right of chart
+
+    ' Add slicers for fields with multiple unique values
+    For i = 1 To lastCol
+        headerName = tblRange.Cells(1, i).Value
+        If headerName <> "Date" And headerName <> "Resource" Then
+            If WorksheetFunction.CountA(wsData.Range(wsData.Cells(2, i), wsData.Cells(wsData.Rows.Count, i))) > 1 Then
+                On Error Resume Next
+                With pt.PivotFields(headerName)
+                    .Orientation = xlPageField
+                    .Position = pt.PageFields.Count + 1
+                End With
+                ActiveWorkbook.SlicerCaches.Add(pt, headerName).Slicers.Add _
+                    SlicerDestination:=wsDash, Name:=headerName, Caption:=headerName, _
+                    Top:=slicerTop, Left:=slicerLeft, Width:=200, Height:=60
+                On Error GoTo 0
+                slicerTop = slicerTop + 70
+            End If
+        End If
+    Next i
+
+    ' Add timeline slicer for Date at bottom of slicer panel
+    On Error Resume Next
+    Set timelineCache = ActiveWorkbook.SlicerCaches.Add2(pt, dateField, xlTimeline)
+    Set timelineSlicer = timelineCache.Slicers.Add(wsDash, , dateField, "Date Timeline", slicerLeft, slicerTop, 200, 100)
+    On Error GoTo 0
+End Sub
+
+
+Sub CreateCriteriaSelection()
+    Dim wsSubs As Worksheet, wsWeights As Worksheet, wsRef As Worksheet, wsCriteria As Worksheet
+    Dim buildingList As Collection, subcontractorList As Collection, criteriaList As Collection
+    Dim cell As Range, col As Long, row As Long
+    Dim building As Variant, subcontractor As Variant, criteria As Variant
+    Dim lastRow As Long, lastCol As Long
+    Dim i As Long
+
+    Set wsSubs = ThisWorkbook.Sheets("Subs Required")
+    Set wsWeights = ThisWorkbook.Sheets("Weights")
+    Set wsRef = ThisWorkbook.Sheets("Reference List")
+    Set wsCriteria = ThisWorkbook.Sheets("Criteria Selection")
+
+    ' Step 1: Create Building List
+    Set buildingList = New Collection
+    col = 1
+    Do While wsSubs.Cells(11, col).Value <> ""
+        buildingList.Add wsSubs.Cells(11, col).Value
+        col = col + 1
+    Loop
+
+    ' Step 2: Loop through each building
+    For Each building In buildingList
+        ' Create Subcontractor List for current building
+        Set subcontractorList = New Collection
+        col = 1
+        Do While wsWeights.Cells(11, col).Value <> ""
+            If wsWeights.Cells(11, col).Value = building And wsWeights.Cells(11, col).Value <> "Sum Check" Then
+                row = 12
+                Do While wsWeights.Cells(row, col).Value <> ""
+                    subcontractorList.Add wsWeights.Cells(row, col).Value
+                    row = row + 1
+                Loop
+                Exit Do
+            End If
+            col = col + 1
+        Loop
+
+        ' Step 3: Loop through each subcontractor
+        For Each subcontractor In subcontractorList
+            ' Create Criteria List for current subcontractor
+            Set criteriaList = New Collection
+            lastRow = wsRef.Cells(wsRef.Rows.Count, "A").End(xlUp).Row
+            For i = 2 To lastRow
+                If wsRef.Cells(i, "B").Value = subcontractor Then ' Assuming "FORM" is column B and "Criteria" is column C
+                    criteriaList.Add wsRef.Cells(i, "C").Value
+                End If
+            Next i
+
+            ' Step 4: Write to Criteria Selection sheet
+            ' Find the column for the current building
+            col = 1
+            Do While wsCriteria.Cells(11, col).Value <> ""
+                If wsCriteria.Cells(11, col).Value = building Then Exit Do
+                col = col + 1
+            Loop
+
+            ' Find the first empty row under the building column
+            row = 12
+            Do While wsCriteria.Cells(row, col).Value <> ""
+                row = row + 1
+            Loop
+
+            ' Write subcontractor name
+            wsCriteria.Cells(row, col).Value = subcontractor
+
+            ' Write criteria starting from next column
+            Dim critCol As Long
+            critCol = col + 1
+            For Each criteria In criteriaList
+                wsCriteria.Cells(row, critCol).Value = criteria
+                row = row + 1
+            Next criteria
+        Next subcontractor
+    Next building
+
+    MsgBox "Criteria Selection sheet updated successfully!"
+End Sub
+
+
+' Write subcontractor name
+wsCriteria.Cells(row, col).Value = subcontractor
+wsCriteria.Cells(row, col).WrapText = False
+
+' Write criteria starting from next column
+critCol = col + 1
+For Each criteria In criteriaList
+    wsCriteria.Cells(row, critCol).Value = criteria
+    wsCriteria.Cells(row, critCol).WrapText = False
+    row = row + 1
+Next criteria
+
+
+
+Dim exportData() As Variant
+ReDim exportData(1 To totalRows, 1 To totalCols) ' Pre-size based on expected output
+
+Dim exportRowIndex As Long
+exportRowIndex = 1
+
+For Each currentCell In Range("A2:A" & Cells(Rows.Count, 1).End(xlUp).Row)
+    ' ... your logic ...
+
+    For i = LBound(resultArray) To UBound(resultArray)
+        ' Instead of writing directly:
+        ' Cells(currentRow, startingCol + i).Value = resultArray(i)
+
+        ' Store in memory array
+        exportData(exportRowIndex, outputDataCol) = resultArray(i)
+        exportRowIndex = exportRowIndex + 1
+    Next i
+Next currentCell
+
+' Dump array to sheet in one go
+outputSheet.Range("A2").Resize(UBound(exportData, 1), UBound(exportData, 2)).Value = exportData
+
+Sub WriteToCells()
+    Dim currentCell As Range
+    Dim distArray As Variant
+    Dim resultArray As Variant
+    Dim startingCol As Variant
+
+    Dim duration As Double
+    Dim startDate As Date
+    Dim finishDate As Date
+    Dim resource As Double
+    Dim distributionType As String
+    Dim calendarType As String
+    Dim exportRow As Long
+    exportRow = 2
+
+    Dim tStart As Double, tLoopStart As Double
+    tStart = Timer
+
+    Application.ScreenUpdating = False
+    Application.Calculation = xlCalculationManual
+    Application.EnableEvents = False
+
+    Dim outputSheet As Worksheet
+    Set outputSheet = ThisWorkbook.Sheets("Export")
+
+    ' Write headers once
+    Dim outputKeys As Collection
+    Set outputKeys = New Collection
+    Dim key As Variant
+    Dim startIndex As Long, endIndex As Long
+    startIndex = ColumnIndex("Activity ID")
+    endIndex = ColumnIndex("Duration")
+
+    For Each key In ColumnIndex.Keys
+        If ColumnIndex(key) > startIndex And ColumnIndex(key) < endIndex Then
+            outputKeys.Add key
+        End If
+    Next key
+
+    Dim outputActivityDescCol As Long
+    Dim outputDateCol As Long
+    Dim outputDataCol As Long
+    outputActivityDescCol = outputKeys.Count
+    outputDateCol = outputActivityDescCol + 1
+    outputDataCol = outputDateCol + 1
+
+    ' Write headers once
+    For keyIndex = 1 To outputKeys.Count
+        outputSheet.Cells(1, keyIndex).Value = outputKeys(keyIndex)
+    Next keyIndex
+    outputSheet.Cells(1, outputDateCol).Value = "Date"
+    outputSheet.Cells(1, outputDataCol).Value = "Resource"
+
+    ' Loop through rows
+    For Each currentCell In Range("A2:A" & Cells(Rows.Count, 1).End(xlUp).Row)
+        If Not IsEmpty(currentCell.Value) Then
+            tLoopStart = Timer
+
+            Dim currentRow As Long
+            currentRow = currentCell.Row
+
+            duration = Cells(currentRow, ColumnIndex("Duration")).Value
+            startDate = Cells(currentRow, ColumnIndex("Start")).Value
+            finishDate = Cells(currentRow, ColumnIndex("Finish")).Value
+            resource = Cells(currentRow, ColumnIndex("Resource")).Value
+            distributionType = Cells(currentRow, ColumnIndex("Distribution")).Value
+            calendarType = Cells(currentRow, ColumnIndex("Calendar")).Value
+
+            distArray = CreateDistributionArray(duration, resource, distributionType)
+            resultArray = AssignDistributionToDates(startDate, duration, distArray, calendarType)
+            startingCol = FindDateColumn(startDate)
+
+            ' Write resultArray to main sheet in one go
+            Range(Cells(currentRow, startingCol), Cells(currentRow, startingCol + UBound(resultArray))).Value = Application.WorksheetFunction.Transpose(resultArray)
+
+            ' Write to Export sheet
+            Dim i As Long
+            For i = LBound(resultArray) To UBound(resultArray)
+                For j = 1 To outputKeys.Count
+                    outputSheet.Cells(exportRow, j).Value = Cells(currentRow, ColumnIndex(outputKeys(j))).Value
+                Next j
+                outputSheet.Cells(exportRow, outputDateCol).Value = Cells(1, startingCol + i).Value
+                outputSheet.Cells(exportRow, outputDataCol).Value = resultArray(i)
+                exportRow = exportRow + 1
+            Next i
+
+            Debug.Print "Row " & currentRow & " took " & Format(Timer - tLoopStart, "0.000") & " seconds"
+        End If
+    Next currentCell
+
+    Application.ScreenUpdating = True
+    Application.Calculation = xlCalculationAutomatic
+    Application.EnableEvents = True
+
+    Debug.Print "Total WriteToCells time: " & Format(Timer - tStart, "0.000") & " seconds"
+End Sub
+
+
+
+
+Sub CreatePivotChartWithSlicerPanel()
+    Dim tStart As Double
+    tStart = Timer
+
+    Dim wsData As Worksheet, wsPivot As Worksheet, wsDash As Worksheet
+    Dim ptCache As PivotCache, pt As PivotTable
+    Dim tblRange As Range
+    Dim lastCol As Long, lastRow As Long, i As Long
+    Dim chartObj As ChartObject
+    Dim headerName As String
+    Dim dateField As String, resourceField As String
+    Dim colIndex As Long
+    Dim slicerTop As Long, slicerLeft As Long
+    Dim timelineCache As SlicerCache
+    Dim timelineSlicer As Slicer
+
+    ' Optimize performance
+    Application.ScreenUpdating = False
+    Application.EnableEvents = False
+    Application.Calculation = xlCalculationManual
+
+    ' Set up sheets
+    Set wsData = ThisWorkbook.Sheets("Export")
+    Set wsDash = ThisWorkbook.Sheets("Dashboard")
+
+    ' Create or clear Pivot sheet
+    On Error Resume Next
+    Set wsPivot = ThisWorkbook.Sheets("Pivot")
+    If wsPivot Is Nothing Then
+        Set wsPivot = ThisWorkbook.Sheets.Add
+        wsPivot.Name = "Pivot"
+    Else
+        wsPivot.Cells.Clear
+    End If
+    wsPivot.Visible = xlSheetHidden
+    wsData.Visible = xlSheetVisible
+    On Error GoTo 0
+
+    ' Delete existing charts
+    For Each chartObj In wsDash.ChartObjects
+        chartObj.Delete
+    Next chartObj
+
+    ' Define table range precisely
+    lastRow = wsData.Cells(wsData.Rows.Count, 1).End(xlUp).Row
+    lastCol = wsData.Cells(1, wsData.Columns.Count).End(xlToLeft).Column
+    Set tblRange = wsData.Range(wsData.Cells(1, 1), wsData.Cells(lastRow, lastCol))
+
+    ' Create PivotCache and PivotTable
+    Set ptCache = ThisWorkbook.PivotCaches.Create(SourceType:=xlDatabase, SourceData:=tblRange)
+    Set pt = ptCache.CreatePivotTable(TableDestination:=wsPivot.Range("A3"), TableName:="AutoPivot")
+
+    ' Find "Date" and "Resource" headers
+    For colIndex = 1 To lastCol
+        Select Case tblRange.Cells(1, colIndex).Value
+            Case "Date": dateField = "Date"
+            Case "Resource": resourceField = "Resource"
+        End Select
+    Next colIndex
+
+    If dateField = "" Or resourceField = "" Then
+        MsgBox "Required fields 'Date' or 'Resource' not found.", vbCritical
+        GoTo Cleanup
+    End If
+
+    ' Add fields to PivotTable
+    With pt.PivotFields(dateField)
+        .Orientation = xlRowField
+        .Position = 1
+    End With
+
+    With pt.PivotFields(resourceField)
+        .Orientation = xlDataField
+        .Function = xlSum
+        .Calculation = xlRunningTotal
+        .BaseField = dateField
+    End With
+
+    ' Create PivotChart
+    Set chartObj = wsDash.ChartObjects.Add(Left:=50, Width:=700, Top:=50, Height:=450)
+    chartObj.Name = "PivotChart"
+    chartObj.Chart.SetSourceData pt.TableRange2
+    chartObj.Chart.ChartType = xlLine
+    chartObj.Chart.ChartStyle = 230
+    chartObj.Chart.HasTitle = True
+    chartObj.Chart.ChartTitle.Text = "Production Over Time"
+
+    ' Slicer panel positioning
+    slicerTop = 50
+    slicerLeft = chartObj.Left + chartObj.Width + 50
+
+    ' Add slicers for fields with multiple unique values
+    For i = 1 To lastCol
+        headerName = tblRange.Cells(1, i).Value
+        If headerName <> "Date" And headerName <> "Resource" Then
+            Dim uniqueCount As Long
+            uniqueCount = WorksheetFunction.CountA(wsData.Range(wsData.Cells(2, i), wsData.Cells(lastRow, i)))
+            If uniqueCount > 1 Then
+                On Error Resume Next
+                With pt.PivotFields(headerName)
+                    .Orientation = xlPageField
+                    .Position = pt.PageFields.Count + 1
+                End With
+                ActiveWorkbook.SlicerCaches.Add(pt, headerName).Slicers.Add _
+                    SlicerDestination:=wsDash, Name:=headerName, Caption:=headerName, _
+                    Top:=slicerTop, Left:=slicerLeft, Width:=200, Height:=60
+                On Error GoTo 0
+                slicerTop = slicerTop + 70
+            End If
+        End If
+    Next i
+
+    ' Add timeline slicer for Date
+    On Error Resume Next
+    Set timelineCache = ActiveWorkbook.SlicerCaches.Add2(pt, dateField, xlTimeline)
+    Set timelineSlicer = timelineCache.Slicers.Add(wsDash, , dateField, "Date Timeline", slicerLeft, slicerTop, 200, 100)
+    On Error GoTo 0
+
+Cleanup:
+    Application.ScreenUpdating = True
+    Application.EnableEvents = True
+    Application.Calculation = xlCalculationAutomatic
+
+    Debug.Print "CreatePivotChartWithSlicerPanel took " & Format(Timer - tStart, "0.000") & " seconds"
+End Sub
+
+
+'This is the working one
+Sub WriteToCells()
+    Dim currentCell As Range
+    Dim distArray As Variant
+    Dim resultArray As Variant
+    Dim startingCol As Variant
+
+    Dim duration As Double
+    Dim startDate As Date
+    Dim finishDate As Date
+    Dim resource As Double
+    Dim distributionType As String
+    Dim calendarType As String
+    Dim exportRow As Long
+    exportRow = 2
+    'ActivateGanttSheet
+
+    ' Loop through non-empty cells in column A
+    For Each currentCell In Range("A2:A" & Cells(Rows.Count, 1).End(xlUp).Row)
+        If Not isEmpty(currentCell.Value) Then
+            Dim currentRow As Long
+            currentRow = currentCell.Row
+
+            ' Get values from the same row
+            duration = Cells(currentRow, ColumnIndex("Duration")).Value
+            startDate = Cells(currentRow, ColumnIndex("Start")).Value
+            finishDate = Cells(currentRow, ColumnIndex("Finish")).Value
+            
+            resource = Cells(currentRow, ColumnIndex("Resource")).Value
+            distributionType = Cells(currentRow, ColumnIndex("Distribution")).Value
+            calendarType = Cells(currentRow, ColumnIndex("Calendar")).Value
+
+            ' Generate distribution and assign values
+            distArray = CreateDistributionArray(duration, resource, distributionType)
+            resultArray = AssignDistributionToDates(startDate, duration, distArray, calendarType)
+            startingCol = FindDateColumn(startDate)
+
+            ' Write resultArray to the row starting at startingCol
+            Dim i As Long
+            Dim outputSheet As Worksheet
+            Set outputSheet = ThisWorkbook.Sheets("Export")
+            Dim key As Variant
+            Dim outputKeys As Collection
+            Set outputKeys = New Collection
+
+            
+            Dim outputActivityDescCol As Long
+            Dim outputDateCol As Long
+            Dim outputDataCol As Long
+
+            'exportRow = startingCol - ColumnIndex("GanttStart") + 1 ' Adjust for header row in Export sheet
+            
+             Dim startIndex As Long, endIndex As Long
+            startIndex = ColumnIndex("Activity ID")
+            endIndex = ColumnIndex("Duration")
+
+            For Each key In ColumnIndex.Keys
+                If ColumnIndex(key) > startIndex And ColumnIndex(key) < endIndex Then
+                    outputKeys.Add key
+                End If
+            Next key
+
+            outputActivityDescCol = outputKeys.Count
+            outputDateCol = outputActivityDescCol + 1
+            outputDataCol = outputDateCol + 1
+            'Debug.Print "ActivityDescCol: " & outputActivityDescCol & ",DateCol: " & outputDateCol & ",DataCol: " & outputDataCol
+
+             ' Adjust for the number of keys
+            
+            For i = LBound(resultArray) To UBound(resultArray)
+                Cells(currentRow, startingCol + i).Value = resultArray(i)
+
+                ' Write to Export sheet
+                Dim j As Long
+                For j = 1 To outputKeys.Count
+                    outputSheet.Cells(1, j).Value = outputKeys(j)
+                    outputSheet.Cells(exportRow, j).Value = Cells(currentRow, ColumnIndex(outputKeys(j))).Value
+                Next j
+
+                outputSheet.Cells(1, outputDateCol).Value = "Date"
+                outputSheet.Cells(1, outputDataCol).Value = "Resource"
+                outputSheet.Cells(exportRow, outputDateCol).Value = Cells(1, startingCol + i).Value
+                outputSheet.Cells(exportRow, outputDataCol).Value = resultArray(i)
+                exportRow = exportRow + 1
+                Debug.Print "ExportRow: " & exportRow
+            Next i
+        End If
+    Next currentCell
+End Sub
+
+
+# Resource Loader Tool
+
+## 📘 Description
+
+The **Resource Loader Tool** allows users to distribute resources over a specified time period using various distribution models and calendar settings. It is designed to support planning, forecasting, and analysis across multiple domains.
+
+---
+
+## 🛠️ Application
+
+This tool can be used for:
+
+- Steel tonnage installation  
+- Concrete cubic yardage placement  
+- Square foot concrete forming  
+- Cash flow analysis  
+- Equipment usage tracking  
+- Manhour distribution across trades  
+
+---
+
+## 🔄 Workflow
+
+1. **Input activities and descriptions**
+2. **Provide a schedule**
+3. **Input resource**
+4. **Select distribution type**
+5. **Select calendar**
+6. **Click "Schedule"**
+
+---
+
+### 🧪 Example Workflow: Concrete Forming
+
+1. **Input forming activities**
+   - Each activity must have a unique `Activity ID`
+   - Description headers may include: `Job#`, `Building`, `Level`, `Subcontractor`, `Category`, `Slab Number`, `Unit of Measure`, etc.
+   - These headers must align with Power BI import fields.
+
+2. **Provide or generate a schedule**
+   - Manually input durations and start dates
+   - Or use the **Generate Schedule** checkbox to auto-calculate based on relationships
+
+3. **Apply the resource**
+   - Input forming square footage per pour
+
+4. **Select distribution**
+   - Choose from dropdown list: `Linear`, `Front-loaded`, `Bell Curve`, etc.
+   - Distribution types are shown on the **Distributions** tab
+
+5. **Choose calendar**
+   - Select from validated dropdown list matching your schedule
+
+6. **Click "Schedule"**
+   - Resource per day is calculated and populated on the **Gantt** sheet
+   - Data is prepared for export to Power BI via the **Export** tab
+   - Click **Visualize** to open the **Dashboard** tab and view resource distribution over time
+
+---
+
+## 📋 Required Fields
+
+- `Activity ID`  
+- Description Fields*  
+- `Duration`  
+- `Start`  
+- `Resource`  
+- `Distribution`  
+- `Calendar`  
+
+> *Description fields are flexible and user-defined. They appear in the **Export** tab and must match Power BI import headers.
+
+---
+
+## 📊 Statistical Outputs
+
+- `MAX`, `MIN` values and their dates  
+- `AVE` (average daily resource)  
+- `SLOPE` (linear interpolation)  
+- `RSq` (R-squared correlation coefficient, 0–1)
+
+> If `RSq` is close to 1, the slope is a reliable estimate of daily resource usage.
+
+---
+
+## 🔘 Buttons
+
+- **Schedule**: Runs the distribution calculation  
+- **Add Plot**: Creates a cumulative plot from Gantt data  
+- **Visualize**: Opens the **Dashboard** tab with a chart  
+- **Reset Data**: Clears all fields and plots  
+
+### 📐 Relationship Scheduling
+
+Enable via checkbox under **Schedule** to add:
+
+- `Rel.` (Relationship Type, default: FS)  
+- `w/` (Related Activity ID, default: Prev)  
+- `Lag` (Lag time before start, default: 0)
+
+---
+
+## 📄 Sheets
+
+- **Gantt**: Main input/output sheet  
+- **Distributions**: Reference for distribution models  
+- **Export**: BI-ready data for dashboards  
+- **Dashboard**: Visual chart of cumulative resource usage
+
+---
+
+## ✅ Tips
+
+- Use dropdowns for `Distribution` and `Calendar` fields  
+- Align headers with Power BI import requirements  
+- Use **Visualize** to assess trends and peaks  
+- High `RSq` values indicate dependable slope estimates
+
+---
+
+## ⚠️ Notes
+
+- Dropdown fields are data validated. You may copy/paste or drag values, but they must match the list.
+- The **Reset** button clears **all** data and plots. Use with caution.
+
+---
+
+God Speed.

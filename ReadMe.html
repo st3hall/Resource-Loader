@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>ReadMe.md</title>
+<meta http-equiv="Content-type" content="text/html;charset=UTF-8">
+
+<style>
+/* https://github.com/microsoft/vscode/blob/master/extensions/markdown-language-features/media/markdown.css */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+body {
+	font-family: var(--vscode-markdown-font-family, -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif);
+	font-size: var(--vscode-markdown-font-size, 14px);
+	padding: 0 26px;
+	line-height: var(--vscode-markdown-line-height, 22px);
+	word-wrap: break-word;
+}
+
+#code-csp-warning {
+	position: fixed;
+	top: 0;
+	right: 0;
+	color: white;
+	margin: 16px;
+	text-align: center;
+	font-size: 12px;
+	font-family: sans-serif;
+	background-color:#444444;
+	cursor: pointer;
+	padding: 6px;
+	box-shadow: 1px 1px 1px rgba(0,0,0,.25);
+}
+
+#code-csp-warning:hover {
+	text-decoration: none;
+	background-color:#007acc;
+	box-shadow: 2px 2px 2px rgba(0,0,0,.25);
+}
+
+body.scrollBeyondLastLine {
+	margin-bottom: calc(100vh - 22px);
+}
+
+body.showEditorSelection .code-line {
+	position: relative;
+}
+
+body.showEditorSelection .code-active-line:before,
+body.showEditorSelection .code-line:hover:before {
+	content: "";
+	display: block;
+	position: absolute;
+	top: 0;
+	left: -12px;
+	height: 100%;
+}
+
+body.showEditorSelection li.code-active-line:before,
+body.showEditorSelection li.code-line:hover:before {
+	left: -30px;
+}
+
+.vscode-light.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.15);
+}
+
+.vscode-light.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.40);
+}
+
+.vscode-light.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-dark.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.4);
+}
+
+.vscode-dark.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.60);
+}
+
+.vscode-dark.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-high-contrast.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 160, 0, 0.7);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 160, 0, 1);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+img {
+	max-width: 100%;
+	max-height: 100%;
+}
+
+a {
+	text-decoration: none;
+}
+
+a:hover {
+	text-decoration: underline;
+}
+
+a:focus,
+input:focus,
+select:focus,
+textarea:focus {
+	outline: 1px solid -webkit-focus-ring-color;
+	outline-offset: -1px;
+}
+
+hr {
+	border: 0;
+	height: 2px;
+	border-bottom: 2px solid;
+}
+
+h1 {
+	padding-bottom: 0.3em;
+	line-height: 1.2;
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+}
+
+h1, h2, h3 {
+	font-weight: normal;
+}
+
+table {
+	border-collapse: collapse;
+}
+
+table > thead > tr > th {
+	text-align: left;
+	border-bottom: 1px solid;
+}
+
+table > thead > tr > th,
+table > thead > tr > td,
+table > tbody > tr > th,
+table > tbody > tr > td {
+	padding: 5px 10px;
+}
+
+table > tbody > tr + tr > td {
+	border-top: 1px solid;
+}
+
+blockquote {
+	margin: 0 7px 0 5px;
+	padding: 0 16px 0 10px;
+	border-left-width: 5px;
+	border-left-style: solid;
+}
+
+code {
+	font-family: Menlo, Monaco, Consolas, "Droid Sans Mono", "Courier New", monospace, "Droid Sans Fallback";
+	font-size: 1em;
+	line-height: 1.357em;
+}
+
+body.wordWrap pre {
+	white-space: pre-wrap;
+}
+
+pre:not(.hljs),
+pre.hljs code > div {
+	padding: 16px;
+	border-radius: 3px;
+	overflow: auto;
+}
+
+pre code {
+	color: var(--vscode-editor-foreground);
+	tab-size: 4;
+}
+
+/** Theming */
+
+.vscode-light pre {
+	background-color: rgba(220, 220, 220, 0.4);
+}
+
+.vscode-dark pre {
+	background-color: rgba(10, 10, 10, 0.4);
+}
+
+.vscode-high-contrast pre {
+	background-color: rgb(0, 0, 0);
+}
+
+.vscode-high-contrast h1 {
+	border-color: rgb(0, 0, 0);
+}
+
+.vscode-light table > thead > tr > th {
+	border-color: rgba(0, 0, 0, 0.69);
+}
+
+.vscode-dark table > thead > tr > th {
+	border-color: rgba(255, 255, 255, 0.69);
+}
+
+.vscode-light h1,
+.vscode-light hr,
+.vscode-light table > tbody > tr + tr > td {
+	border-color: rgba(0, 0, 0, 0.18);
+}
+
+.vscode-dark h1,
+.vscode-dark hr,
+.vscode-dark table > tbody > tr + tr > td {
+	border-color: rgba(255, 255, 255, 0.18);
+}
+
+</style>
+
+<style>
+/* Tomorrow Theme */
+/* http://jmblog.github.com/color-themes-for-google-code-highlightjs */
+/* Original theme - https://github.com/chriskempson/tomorrow-theme */
+
+/* Tomorrow Comment */
+.hljs-comment,
+.hljs-quote {
+	color: #8e908c;
+}
+
+/* Tomorrow Red */
+.hljs-variable,
+.hljs-template-variable,
+.hljs-tag,
+.hljs-name,
+.hljs-selector-id,
+.hljs-selector-class,
+.hljs-regexp,
+.hljs-deletion {
+	color: #c82829;
+}
+
+/* Tomorrow Orange */
+.hljs-number,
+.hljs-built_in,
+.hljs-builtin-name,
+.hljs-literal,
+.hljs-type,
+.hljs-params,
+.hljs-meta,
+.hljs-link {
+	color: #f5871f;
+}
+
+/* Tomorrow Yellow */
+.hljs-attribute {
+	color: #eab700;
+}
+
+/* Tomorrow Green */
+.hljs-string,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-addition {
+	color: #718c00;
+}
+
+/* Tomorrow Blue */
+.hljs-title,
+.hljs-section {
+	color: #4271ae;
+}
+
+/* Tomorrow Purple */
+.hljs-keyword,
+.hljs-selector-tag {
+	color: #8959a8;
+}
+
+.hljs {
+	display: block;
+	overflow-x: auto;
+	color: #4d4d4c;
+	padding: 0.5em;
+}
+
+.hljs-emphasis {
+	font-style: italic;
+}
+
+.hljs-strong {
+	font-weight: bold;
+}
+</style>
+
+<style>
+/*
+ * Markdown PDF CSS
+ */
+
+ body {
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif, "Meiryo";
+	padding: 0 12px;
+}
+
+pre {
+	background-color: #f8f8f8;
+	border: 1px solid #cccccc;
+	border-radius: 3px;
+	overflow-x: auto;
+	white-space: pre-wrap;
+	overflow-wrap: break-word;
+}
+
+pre:not(.hljs) {
+	padding: 23px;
+	line-height: 19px;
+}
+
+blockquote {
+	background: rgba(127, 127, 127, 0.1);
+	border-color: rgba(0, 122, 204, 0.5);
+}
+
+.emoji {
+	height: 1.4em;
+}
+
+code {
+	font-size: 14px;
+	line-height: 19px;
+}
+
+/* for inline code */
+:not(pre):not(.hljs) > code {
+	color: #C9AE75; /* Change the old color so it seems less like an error */
+	font-size: inherit;
+}
+
+/* Page Break : use <div class="page"/> to insert page break
+-------------------------------------------------------- */
+.page {
+	page-break-after: always;
+}
+
+</style>
+
+<script src="https://unpkg.com/mermaid/dist/mermaid.min.js"></script>
+</head>
+<body>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: document.body.classList.contains('vscode-dark') || document.body.classList.contains('vscode-high-contrast')
+          ? 'dark'
+          : 'default'
+    });
+  </script>
+<h1 id="resource-loader">Resource Loader</h1>
+<h2 id="description">Description</h2>
+<p>This Resource loading tool allows you to input schedule data, and a Resource, then project the Resource distribution over the specified time period based on various distrubtion models, and calendars.</p>
+<p>Additionally you can use the built in scheduling tools to generate the scehedule data based on an initial start date, durations, and relationship information, such as Finish Start (FS) or Start Start (SS) relationships with Lag.</p>
+<h2 id="explaination">Explaination</h2>
+<p>There are various buttons and fields associated with this tool:</p>
+<h3 id="buttons">Buttons</h3>
+<ul>
+<li>Shedule</li>
+<li>Add Plot</li>
+<li>Visualize</li>
+<li>Reset Data</li>
+</ul>
+<p>The &quot;Schedule&quot; button (and corresponding check box) allow you to take data you have input and project it out based on distribution and calendar selections.</p>
+<p>The check box below the schedule button is to enable schedule calcuation based on relationships, selecting the box will enable 3 addtional columns:</p>
+<ul>
+<li>Rel. <em>(Relationship Type. Default: FS)</em></li>
+<li>w/ <em>(What activity is the relationship with. Default: Previous Activity, Prev)</em></li>
+<li>Lag <em>(The lag time befor the start of the related activity. Default: 0)</em></li>
+</ul>
+<p>Once clicking on the schedule button and the calculations are complete, the fields for MAX, MIN, the dates the occur on, AVE, SLOPE (linear interpolation), and the R Squared (RSq) Correlation ratio (0-1) will be diplayed for the current scheduled data.</p>
+<p>*<em>If the RSq value is close to 1, then the slope can be interpreted as the typical resouce utilization required to achieve the schedule.</em></p>
+<p>The &quot;Add Plot&quot; button will take the projected data displayed in the gantt (to the right) and will create a cumulative plot. That can be visualized. The value in the &quot;Category&quot; column will be the header for the plot data.</p>
+<p>The &quot;Visualize&quot; button takes the most recent plot and will create a chart showing the cumulative distribution of that Resource over time. Checkboxes are available to show data labels, and trend line on the chart. The chart is generated and will open in the &quot;ProductionChart&quot; tab.</p>
+<p>The &quot;Reset&quot; button clears the <strong>ALL</strong> the fields and current plots. God Speed.</p>
+<h3 id="sheets">Sheets</h3>
+<ul>
+<li>Gantt</li>
+<li>Plot</li>
+<li>Distributions</li>
+<li>ProductionChart (This will be generated automatically if not already present)</li>
+</ul>
+<p>The &quot;Gantt&quot; sheet is the user will input data, and where the data will be projected.</p>
+<p>&quot;Plot&quot; is the sheet where the cumulative data pairs (Date, Value) are stored.</p>
+<p>&quot;Distributions&quot; is a sheet containing a table that provides a visualization of the various distribution types.</p>
+<p>&quot;ProductionChart&quot; is a sheet containing the chart of plotted data. This sheet will be regenerated if deleted.</p>
+<h4 id="distribution-types-and-descriptions">Distribution Types and Descriptions</h4>
+<ul>
+<li>Linear
+<ul>
+<li>Resource is divided evenly by the duration.</li>
+</ul>
+</li>
+<li>Bell Curve
+<ul>
+<li>Resource utilization ramps up sharply, peaks in the middle of the duration then down.</li>
+</ul>
+</li>
+<li>Double Peak
+<ul>
+<li>Resource utilization ramps up sharply then down, experiences a local minimum at mid duration then peaks again with another sharp decline.</li>
+</ul>
+</li>
+<li>Back Loaded
+<ul>
+<li>Resource utilization is weighed higher in last of the duration.</li>
+</ul>
+</li>
+<li>Front Loaded
+<ul>
+<li>Resource utilization is weighed higher in the first half duration.</li>
+</ul>
+</li>
+<li>Trapazoidal
+<ul>
+<li>Resource utilization ramps up then settles into linear utilization for about half the overall duation then back down.</li>
+</ul>
+</li>
+<li>Smooth Trap
+<ul>
+<li>Resource utilization begins immedatly with a slow, slight increase in utilization then slowly decreases slightly lower than initial utilization.</li>
+</ul>
+</li>
+<li>Steel Fab
+<ul>
+<li>Resource utilization begins late, however experiences a sharp and steady increase in utiliztaion to the end of the duration. Continual increase.</li>
+</ul>
+</li>
+<li>Soft Front
+<ul>
+<li>Similar to Front Loaded, with the difference being a more gradual decrease in utilization over the duration. Near to linear.</li>
+</ul>
+</li>
+</ul>
+<h4 id="calendars">Calendars</h4>
+<p>The calendars included are:
+There are 6 calendars included, and room for custom calendars.</p>
+<ul>
+<li>5 day work week with and without holidays.</li>
+<li>6 day work week with and without holidays.</li>
+<li>7 day work week with and without holidays.</li>
+</ul>
+<p>Holidays are standard, and more can be added if necessary.</p>
+<h4 id="limitations">Limitations</h4>
+<p>Activity duration should not exceed 1000 days (days or any other unit of duration).
+If necessay to exceed the duration limiation, break the activitiy into smaller components.</p>
+<p>MAX, and MIN, will take the earliest occuurance IF there are multiple days with those values. SLOPE, and RSq only reflect linear correlation. If RSq is a low corelaction (Closer to 0) then understand the the linear representation may not be suitable for your purposes.</p>
+<p>Error introduction, some durations that are not easily divisable into 1000 (See duration limiation) will create errors in the resource distribution, anywhere from between 1% to 8%. Note the &quot;Error&quot; column. Breaking the actvity and duration into more managable chunks will mitigate this.</p>
+<pre class="hljs"><code><div>Error Caculation:
+(Resource - Sum of Distributed Resource (Gantt Data)) / Resource
+*This value is the delta of the resource and the sum of Resource compared to the total resource*
+</div></code></pre>
+<p>Code Explaination
+These are the two modules that contain various functions inside this workbook:</p>
+<pre class="hljs"><code><div>**GanttModule**
+Core Functions:
+    SumByDistributions
+        -This function takes the distrubtion plot slection along with the duration and returns an array of len(duration) with each arr(i) having an equal distribution of points.
+    CreateDistributionArray
+        -This function multiplies the resource value and the SumByDistributions array, creating a new array equal to the distribution of resouses per duration.
+    AssignDistributionToDates
+        -This function takes the CreateDistributionArray and accounts for workdays and holidays.
+    CalcuateStartAndFinish
+        -This function takes the start date and duration and caculates the end date, then uses the relationship data (if any) to calculate the subsequent activity start date.
+    GetDateCustom
+        -This function parces through the duration using calendar workdays and holidays, returns a date from its calcuation. This will be used in the schedule calculation.
+    PopulateDateHeaders
+        -This populates and ensures proper format for the dates along the gantt header. It looks for the earliest start date and latest finish date as its range.
+    WriteToCells
+        - This function writes the values of CreateDistributionArray to the gantt table
+    RunResources
+        -This is the subroutine that executes the functions in order.
+
+    Helper Functions:
+        InitializeColumnIndex *helper
+            -This inializies all the columns at their current locations
+        IDFinishDate
+            -This function will use the schedule logic to calcuate the finish date if using an acitivy ID in the w/ column, used in in tandum with GetDateCustom.
+        IDStartDate *helper
+            -This function will use the schedule logic to calcuate the Start date if using an acitivy ID in the w/ column, used in in tandum with GetDateCustom.
+        ClearAllInteriorColor *helper
+            -Clears the form cell colors
+        ClearFromJ2 *helper
+            -Clears the form
+            -This function returns a column of data based on table selection
+        ActivateGanttSheet *helper
+        ShowMyForm *helper
+        GetLastColumnRange *helper
+        DebugDateRange *helper
+        DiagnoseClearContentsIssue *helper
+        FineDateColumn *helper
+        FormatDateRange *helper
+        GetTableRange *helper
+        GetColumn *helper
+
+**Plotting Module**
+Core Functions:
+    SumValuesByDate
+        -This function takes the sum of all the calculated values by date, it stores the data on the plot sheet
+    CreateChartOnNewSheet
+        -This function creates a new plot from the data generated from SumValuesByDate on the plot sheet.
+    GetTrandlineStats
+        -Calculates and populates the data for slope and RSq
+    RunChartting
+        -This subroutine executes the functions in order
+    
+    Helper Functions:
+        UpdateChartFormatting *helper
+            - Checks for the &quot;data lables&quot; and &quot;trend line&quot; check boxes and adds them to the plot based on their status.
+        FormatChart *helper
+            -Formats the chart
+        GetLastUsedColumnPair *helper
+        SheetsExists *helper
+</div></code></pre>
+
+</body>
+</html>

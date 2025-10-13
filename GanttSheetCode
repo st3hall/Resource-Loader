@@ -1,0 +1,66 @@
+Private Sub AddPlot_Click()
+    AddPlot.Enabled = False
+    Call InitializeColumnIndex
+    Call SumValuesByDate(True)
+End Sub
+
+Private Sub Label4_Click()
+
+End Sub
+
+Private Sub Label5_Click()
+
+End Sub
+
+Private Sub Label6_Click()
+
+End Sub
+
+Private Sub Label7_Click()
+
+End Sub
+
+Private Sub RelationBox_Click()
+    Call InitializeColumnIndex
+    Dim startColLetter As String, endColLetter As String
+    
+    startColLetter = ColumnLetter(ColumnIndex("Rel."))
+    endColLetter = ColumnLetter(ColumnIndex("Lag"))
+
+    If RelationBox.Value = True Then
+        Columns(startColLetter & ":" & endColLetter).EntireColumn.Hidden = False
+        MsgBox "Start dates will be calculated based on relationship." & vbNewLine & "Default: Finish Start with Previous Activity, Lag = 0"
+    Else
+        Columns(startColLetter & ":" & endColLetter).EntireColumn.Hidden = True
+        MsgBox "Start dates will NOT be calculated."
+    End If
+
+End Sub
+
+Private Sub ResetButton_Click()
+    Set plotWS = ThisWorkbook.Sheets("Plot")
+    ResetButton.Enabled = False
+    Call ClearFromJ2
+    plotWS.Cells.ClearContents
+End Sub
+
+Private Sub ScheduleButton_Click()
+    AddPlot.Enabled = True
+    ResetButton.Enabled = True
+    Call RunResources
+End Sub
+
+Private Sub GraphButton_Click()
+    Call RunChartting
+End Sub
+
+
+'Author: Steve Hall P.E.
+'Email: shall@austin-ind.com
+'Date: 2025-09-11
+'Version: 1.5
+
+
+
+
+
