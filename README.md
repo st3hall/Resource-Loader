@@ -1,31 +1,23 @@
 # Resource Loader
 ## Table of Contents
-- Overview
-- Application
-- Workflow
-  - Example Workflow
-- Interface & Functional Components
-  - Required Fields
-    - Activity ID
-    - Description Fields*
-    - Duration
-    - Start
-    - Resource
-    - Distribution
-    - Calendar
-  - Buttons
-    - Schedule
-      - Calculate Relationships
-    - Visualize
-      - Show Data Lables
-      - Show Trend Line
-    - Reset Data
-  - Sheets
-    - Gantt
-    - Distributions
-    - Export
-    - Dashboard
-    - Hidden
+- [Resource Loader](#resource-loader)
+  - [Table of Contents](#table-of-contents)
+  - [Overview](#overview)
+  - [Application](#application)
+  - [Workflow](#workflow)
+    - [Example Workflow: Concrete, forming.](#example-workflow-concrete-forming)
+  - [Interface \& Functional Components](#interface--functional-components)
+    - [Required fields:](#required-fields)
+    - [Buttons:](#buttons)
+    - [Sheets:](#sheets)
+    - [Advanced Features](#advanced-features)
+      - [Statistical Outputs](#statistical-outputs)
+      - [Relationship based Scheduling](#relationship-based-scheduling)
+      - [Distribution Types and Descriptions](#distribution-types-and-descriptions)
+      - [Calendars](#calendars)
+      - [Limitations](#limitations)
+      - [Code Explaination](#code-explaination)
+  - [Author](#author)
      
 
 ## Overview
