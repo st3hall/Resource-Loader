@@ -1,5 +1,9 @@
 
+## Latest File Download
+[Download Workbook](https://github.com/st3hall/Resource-Loader/raw/refs/heads/main/ResourceLoadingWorkbook-R10.xlsm)
+
 ## Table of Contents
+- [Latest File Download](#latest-file-download)
 - [Table of Contents](#table-of-contents)
 - [Overview](#overview)
 - [Application](#application)
