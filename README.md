@@ -24,7 +24,6 @@
      
 
 ## Overview
-
 The Resource Loader Tool enables users to distribute resources across a defined time period using customizable distribution models and calendar settings. It supports a wide range of planning and forecasting needs, including construction activities, labor planning, equipment usage, and financial analysis.
 
 ![User Interface](workbookOverview.png)
@@ -40,7 +39,6 @@ This tool can be used for:
 - Manhour distribution across trades  
 
 ## Workflow
-
 1. Input activities, and descriptions
 2. Provide a schedule
 3. Input resource
@@ -70,6 +68,7 @@ This tool can be used for:
 
 ## Interface and Functional Components
 ![User Interface](workbookUserInterfaceCallOuts.png)
+
 ### Required fields
  - Activity ID
  - Description Fields*

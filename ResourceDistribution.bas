@@ -298,7 +298,6 @@ Function FindDateColumn(startDate As Date) As Variant
     End If
 End Function
 
-'This subroutine will take outputArray (the array that holds the distribution values) for each date in the duration
 Sub WriteToCells()
     Dim currentCell As Range
     Dim distArray As Variant
@@ -488,7 +487,7 @@ Function CalculateStartAndFinish(flag As Boolean) As Boolean
             CalculateStartAndFinish = False
             Exit Function
         Else
-            Cells(i, ColumnIndex("Finish")).Value = GetDateCustom(Cells(i, ColumnIndex("Start")).Value, Cells(i, ColumnIndex("Duration")).Value, Cells(i, ColumnIndex("Calendar")).Value)
+            Cells(i, ColumnIndex("Finish")).Value = GetDateCustom(Cells(i, ColumnIndex("Start")).Value, Cells(i, ColumnIndex("Duration")).Value, Cells(i, ColumnIndex("Calendar")).Value) - 1
         End If
     Next i
 End Function
@@ -553,10 +552,7 @@ Function GetDateCustom(Start As Date, duration As Double, calendar As String) As
                 workingDayCount = workingDayCount + 1
             End If
         End If
-        
-        If workingDayCount < duration Then
-            currentDate = currentDate + 1
-        End If
+        currentDate = currentDate + 1
     Loop
 
     ' Ensure the final date is also a valid working day
@@ -750,6 +746,43 @@ Sub DeleteEmptyRows(ws As Worksheet, Optional checkCols As Variant)
     Application.ScreenUpdating = True
 End Sub
 
+Sub ShowInfoImageIfMissing()
+    Dim imgName As String
+    imgName = "Info"
+
+    Dim img As Shape
+    On Error Resume Next
+    Set img = ActiveSheet.Shapes(imgName)
+    On Error GoTo 0
+
+    ' If image exists, just make sure it's visible
+    If Not img Is Nothing Then
+        img.Visible = True
+        Exit Sub
+    End If
+
+    ' If image is missing, copy it from the Holidays sheet
+    Dim imgSource As Shape
+    On Error Resume Next
+    Set imgSource = Sheets("Calendars").Shapes("StoredInfo")
+    On Error GoTo 0
+
+    If imgSource Is Nothing Then
+        'MsgBox "Image named 'Info' not found on Holidays sheet.", vbExclamation
+        Exit Sub
+    End If
+
+    imgSource.Copy
+    ActiveSheet.Paste
+    Set img = ActiveSheet.Shapes(ActiveSheet.Shapes.Count)
+    img.Name = imgName
+    img.Top = Range("A1").Top
+    img.Left = Range("A1").Left
+    img.Placement = xlMoveAndSize
+    img.ZOrder msoSendToBack
+End Sub
+
+
 Sub RunResources()
     Dim success As Boolean
     Dim targetWS As Worksheet
@@ -772,7 +805,7 @@ Sub RunResources()
     Call SumValuesByDate(False)
     Call GetTrendlineStats
     Call DeleteEmptyRows(ThisWorkbook.Sheets("Export"))
-    'Call CreatePivotChartWithSlicerPanel
+    Call CreatePivotChartWithSlicerPanel
     
 End Sub
 

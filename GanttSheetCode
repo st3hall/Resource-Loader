@@ -4,6 +4,27 @@ Private Sub AddPlot_Click()
     Call SumValuesByDate(True)
 End Sub
 
+Private Sub InfoButton_Click()
+    ThisWorkbook.FollowHyperlink "https://st3hall.github.io/Resource-Loader/"
+'    Dim img As Shape
+'    Dim imgName As String
+'    imgName = "Info"
+'
+'    On Error Resume Next
+'    Set img = ActiveSheet.Shapes(imgName)
+'    On Error GoTo 0
+'
+'    If img Is Nothing Then
+'        ' Image is missing — restore it from Holidays sheet
+'        Call ShowInfoImageIfMissing
+'    Else
+'        ' Image exists — toggle visibility
+'        img.Visible = Not img.Visible
+'    End If
+End Sub
+
+
+
 Private Sub Label4_Click()
 
 End Sub
@@ -17,6 +38,10 @@ Private Sub Label6_Click()
 End Sub
 
 Private Sub Label7_Click()
+
+End Sub
+
+Private Sub ListBox1_Click()
 
 End Sub
 
@@ -38,6 +63,7 @@ Private Sub RelationBox_Click()
 End Sub
 
 Private Sub ResetButton_Click()
+    Call InitializeColumnIndex
     Set plotWS = ThisWorkbook.Sheets("Plot")
     ResetButton.Enabled = False
     Call ClearFromJ2
@@ -45,13 +71,17 @@ Private Sub ResetButton_Click()
 End Sub
 
 Private Sub ScheduleButton_Click()
-    AddPlot.Enabled = True
+    'AddPlot.Enabled = True
     ResetButton.Enabled = True
     Call RunResources
 End Sub
 
 Private Sub GraphButton_Click()
-    Call RunChartting
+    'Call RunChartting
+    Set wsDash = ThisWorkbook.Sheets("Dashboard")
+    wsDash.Visible = xlSheetVisible
+    wsDash.Activate
+    UpdateChartFormatting
 End Sub
 
 
