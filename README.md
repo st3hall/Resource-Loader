@@ -1,4 +1,32 @@
 # Resource Loader
+## Table of Contents
+- Overview
+- Application
+- Workflow
+  - Example Workflow
+- Interface & Functional Components
+  - Required Fields
+    - Activity ID
+    - Description Fields*
+    - Duration
+    - Start
+    - Resource
+    - Distribution
+    - Calendar
+  - Buttons
+    - Schedule
+      - Calculate Relationships
+    - Visualize
+      - Show Data Lables
+      - Show Trend Line
+    - Reset Data
+  - Sheets
+    - Gantt
+    - Distributions
+    - Export
+    - Dashboard
+    - Hidden
+     
 
 ## Overview
 
@@ -43,6 +71,7 @@ This tool can be used for:
 
 *The schedule values can be copied from P6, another workbook, manually input, or calculated. However, drop down fields such as "Distribution" and "Calendar", are data validated. Your selection must be one from the drop down list. You can copy and paste, or drag down in those fields these values as well, but they are limited to the values on the list.*
 
+## Interface & Functional Components
 ### Required fields:
  - Activity ID
  - Description Fields*
@@ -79,6 +108,13 @@ The "Reset" button clears the **ALL** the fields and current plots.
  - Distributions
  - Export
  - Dashboard
+ - (Hidden)
+   - Calendars
+   - Holidays
+   - Pivot
+   - Plot
+   - ProductionChart
+   - Distribution Tables
 
 The "Gantt" sheet is the user will input data, and where the data will be projected.
 
@@ -87,6 +123,15 @@ The "Gantt" sheet is the user will input data, and where the data will be projec
 "Export" contains the calculated data in a format for use with BI dashboards.
 
 "Dashboard" is a sheet containing a chart of plotted data.
+
+Sheets have been hidden to avoid unknowinly disrupting the program. 
+- Calendars contains a few tables where the calendars are represented, ie. 5 day, 6 day, 7 day no holiday. It also stores the graphical overlay, to be restored if deleted.
+- Holidays contains a table with a list of all the typical holidays up to New Years Eve 2030.
+- Pivot contains the pivot table connected to the pivot chart.
+- Plot containts a table with the dates and running total of the daily resource.
+- ProductionChart contanes a chart that grapically represents the data on Plot.
+- Distribution Tables contains a table with all the distribution charts plotted from 1 to 1000. The charts are normalized values, so the sum of each plot will be equal to 1.
+
 
 ### Advanced Features
 #### Statistical Outputs
