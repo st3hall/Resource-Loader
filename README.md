@@ -6,16 +6,16 @@
 - [Workflow](#workflow)
   - [Example Workflow: Concrete, forming.](#example-workflow-concrete-forming)
 - [Interface \& Functional Components](#interface--functional-components)
-  - [Required fields:](#required-fields)
-  - [Buttons:](#buttons)
-  - [Sheets:](#sheets)
+  - [Required fields](#required-fields)
+  - [Buttons](#buttons)
+  - [Sheets](#sheets)
   - [Advanced Features](#advanced-features)
     - [Statistical Outputs](#statistical-outputs)
     - [Relationship based Scheduling](#relationship-based-scheduling)
     - [Distribution Types and Descriptions](#distribution-types-and-descriptions)
     - [Calendars](#calendars)
-    - [Limitations](#limitations)
-    - [Code Explaination](#code-explaination)
+- [Limitations](#limitations)
+- [Code Overview](#code-overview)
 - [Author](#author)
      
 
@@ -63,7 +63,7 @@ This tool can be used for:
 *The schedule values can be copied from P6, another workbook, manually input, or calculated. However, drop down fields such as "Distribution" and "Calendar", are data validated. Your selection must be one from the drop down list. You can copy and paste, or drag down in those fields these values as well, but they are limited to the values on the list.*
 
 ## Interface & Functional Components
-### Required fields:
+### Required fields
  - Activity ID
  - Description Fields*
  - Duration
@@ -76,7 +76,7 @@ This tool can be used for:
 
 *Non-Required fields include any of the columns between Activity ID and Duration as well as the Finish field. The finish date will be overwritten to reflect the finish date calculated from the start date using the selected calendar.*
 
-### Buttons:
+### Buttons
  - Schedule
    - Calculate Relationships*
  - Visualize
@@ -94,7 +94,7 @@ The "Visualize" button opens up the "Dashboard" tab, showing a chart containing 
 
 The "Reset" button clears the **ALL** the fields and current plots.
 
-### Sheets:
+### Sheets
  - Gantt
  - Distributions
  - Export
@@ -164,7 +164,7 @@ There are 6 calendars included, and room for custom calendars.
 
 Holidays are standard, and more can be added if necessary.
 
-#### Limitations
+## Limitations
 Activity duration should not exceed 1000 days (days or any other unit of duration).
 If necessay to exceed the duration limiation, break the activitiy into smaller components.
 
@@ -173,7 +173,7 @@ User added columns may only be added beween the *Activity ID* and *Duration* col
 MAX, and MIN, will take the earliest occuurance IF there are multiple days with those values. SLOPE, and RSq only reflect linear correlation. If RSq is a low corelaction (Closer to 0) then understand the the linear representation may not be suitable for your purposes.
 
 
-#### Code Explaination
+## Code Overview
 ```
 **GanttModule**
 Core Functions:
