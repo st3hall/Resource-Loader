@@ -9,6 +9,10 @@
   - [Required fields](#required-fields)
   - [Buttons](#buttons)
   - [Sheets](#sheets)
+    - [Gantt](#gantt)
+    - [Distribution](#distribution)
+    - [Export](#export)
+    - [Dashboard](#dashboard)
   - [Advanced Features](#advanced-features)
     - [Statistical Outputs](#statistical-outputs)
     - [Relationship based Scheduling](#relationship-based-scheduling)
@@ -22,6 +26,8 @@
 ## Overview
 
 The Resource Loader Tool enables users to distribute resources across a defined time period using customizable distribution models and calendar settings. It supports a wide range of planning and forecasting needs, including construction activities, labor planning, equipment usage, and financial analysis.
+
+![User Interface](workbookOverview.png)
 
 ## Application
 This tool can be used for:
@@ -63,6 +69,7 @@ This tool can be used for:
 *The schedule values can be copied from P6, another workbook, manually input, or calculated. However, drop down fields such as "Distribution" and "Calendar", are data validated. Your selection must be one from the drop down list. You can copy and paste, or drag down in those fields these values as well, but they are limited to the values on the list.*
 
 ## Interface and Functional Components
+![User Interface](workbookUserInterfaceCallOuts.png)
 ### Required fields
  - Activity ID
  - Description Fields*
@@ -107,13 +114,20 @@ The "Reset" button clears the **ALL** the fields and current plots.
    - ProductionChart
    - Distribution Tables
 
-The "Gantt" sheet is the user will input data, and where the data will be projected.
+#### Gantt
+The "Gantt" sheet is the user will input data, and where the data will be projected. More detail in [Interface and Functional Components](#interface-and-functional-components)
 
-"Distributions" is a sheet containing a table that provides a visualization of the various distribution types.
+#### Distribution
+"Distributions" is a sheet containing a table that provides a visualization of the various distribution types. Details in [Distribution Types and Descriptions](#distribution-types-and-descriptions)
 
+#### Export
 "Export" contains the calculated data in a format for use with BI dashboards.
+![Export Tab](exportTable.png)
 
-"Dashboard" is a sheet containing a chart of plotted data.
+#### Dashboard
+"Dashboard" is a sheet containing a chart of plotted data. The user can interact with slicers corresponding to the activity description fields. The checkboxes for line of best fit and data lables will be populated on the chart based on user selections as well.
+![Dashboard](dashboardPlot.png)
+
 
 Sheets have been hidden to avoid unknowinly disrupting the program. 
 - Calendars contains a few tables where the calendars are represented, ie. 5 day, 6 day, 7 day no holiday. It also stores the graphical overlay, to be restored if deleted.
@@ -129,6 +143,8 @@ Sheets have been hidden to avoid unknowinly disrupting the program.
 Key data points such as MAX, MIN, AVE, values along with SLOPE (linear interpolation) an approximate value of resource required per day in order to achieve the projection, and the R Squared (RSq) a value (0-1, 0 not corelated) that tells you how dependable the SLOPE value is. 
 
 #### Relationship based Scheduling
+![Calculate Relationships](calcRelationship.png)
+
 You can use the built in scheduling tools to generate the schedule data based on an initial start date, durations, and relationship information, such as Finish Start (FS) or Start Start (SS) relationships with Lag. 
 The check box below the schedule button will enable schedule calcuation based on relationships, selecting the box will enable 3 addtional columns:
  - Rel. *(Relationship Type. Default: FS)*
@@ -136,6 +152,8 @@ The check box below the schedule button will enable schedule calcuation based on
  - Lag *(The lag time befor the start of the related activity. Default: 0)*
 
 #### Distribution Types and Descriptions
+![Distribution Plots](distributionPlots.png)
+
  - Linear
    - Resource is divided evenly by the duration.
  - Bell Curve
