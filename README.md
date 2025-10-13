@@ -5,7 +5,7 @@
 - [Application](#application)
 - [Workflow](#workflow)
   - [Example Workflow: Concrete, forming.](#example-workflow-concrete-forming)
-- [Interface \& Functional Components](#interface--functional-components)
+- [Interface and Functional Components](#interface-and-functional-components)
   - [Required fields](#required-fields)
   - [Buttons](#buttons)
   - [Sheets](#sheets)
@@ -62,7 +62,7 @@ This tool can be used for:
 
 *The schedule values can be copied from P6, another workbook, manually input, or calculated. However, drop down fields such as "Distribution" and "Calendar", are data validated. Your selection must be one from the drop down list. You can copy and paste, or drag down in those fields these values as well, but they are limited to the values on the list.*
 
-## Interface & Functional Components
+## Interface and Functional Components
 ### Required fields
  - Activity ID
  - Description Fields*
