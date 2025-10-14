@@ -190,3 +190,158 @@ Sub AddLabelsAndTrendlineToPivotChart(ShowDataLabels As Boolean, ShowTrendLine A
     'MsgBox "PivotChart updated with new data labels and trendlines."
 End Sub
 
+Function ExportPivotTableDataToNewWorkbook()
+    Dim ptSheet As Worksheet
+    Dim pt As PivotTable
+    Dim dataRange As Range
+    Dim exportSheet As Worksheet
+    Dim newWb As Workbook
+
+    ' Prompt for the new sheet name
+    sheetName = InputBox("Enter a name for the export sheet:", "Export Sheet Name")
+    If sheetName = "" Then
+        MsgBox "Export cancelled. No sheet name provided.", vbExclamation
+        Exit Function
+    End If
+
+    ' Set your PivotTable sheet and PivotTable name
+    Set ptSheet = ThisWorkbook.Sheets("Pivot") ' Change to your sheet name
+    Set pt = ptSheet.PivotTables("AutoPivot")     ' Change to your PivotTable name
+
+    ' Get the visible data range of the PivotTable
+    Set dataRange = pt.TableRange1
+
+    ' Create a new sheet in the current workbook
+    Set exportSheet = ThisWorkbook.Sheets.Add(After:=ThisWorkbook.Sheets(ThisWorkbook.Sheets.Count))
+    On Error Resume Next
+    exportSheet.Name = sheetName
+    If Err.Number <> 0 Then
+        MsgBox "Invalid or duplicate sheet name. Please try again.", vbCritical
+        ExportPivotTableDataToNewWorkbook = ""
+        Exit Function
+    End If
+    On Error GoTo 0
+
+    ' Copy the PivotTable data to the new sheet
+    dataRange.Copy Destination:=exportSheet.Range("A1")
+
+    MsgBox "PivotTable data exported successfully to new tab" & sheetName
+    ExportPivotTableDataToNewWorkbook = sheetName
+End Function
+
+Sub CreateChartOnSheet(sheetName As String)
+    Dim ws As Worksheet
+    Dim chartObj As ChartObject
+    Dim lastRow As Long
+    Dim chartRangeX As Range, chartRangeY As Range
+
+    ' Set the worksheet
+    Set ws = ThisWorkbook.Sheets(sheetName)
+
+    ' Find the last row with data in column A (assumes both columns have same number of rows)
+    lastRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
+
+    ' Define the ranges for X and Y values
+    Set chartRangeX = ws.Range("A2:A" & lastRow)
+    Set chartRangeY = ws.Range("B2:B" & lastRow)
+
+    ' Add a chart object to the sheet
+    Set chartObj = ws.ChartObjects.Add(Left:=300, Width:=500, Top:=50, Height:=300)
+
+    With chartObj.Chart
+        .ChartType = xlLine
+        .SeriesCollection.NewSeries
+        With .SeriesCollection(1)
+            .Name = "=""Production Over Time"""
+            .XValues = chartRangeX
+            .Values = chartRangeY
+        End With
+        .HasTitle = True
+        .ChartTitle.Text = "Production Over Time"
+    End With
+End Sub
+
+Sub RunExportAndChart()
+    Dim exportSheetName As String
+
+    exportSheetName = ExportPivotTableDataToNewWorkbook
+    If exportSheetName <> "" Then
+        Call CreateChartOnSheet(exportSheetName)
+    End If
+End Sub
+
+
+Sub MoveSheetsExceptSpecified()
+    Dim ws As Worksheet
+    Dim excludeSheets As Variant
+    Dim newWbName As String
+    Dim tempWb As Workbook
+
+    ' Prompt for the new workbook name
+    newWbName = InputBox("Enter a name for the new workbook (without extension):", "New Workbook Name")
+    If newWbName = "" Then
+        MsgBox "Operation cancelled. No workbook name provided.", vbExclamation
+        Exit Sub
+    End If
+
+    ' List of sheet names to exclude from moving
+    excludeSheets = Array("Gantt", "Distributions", "Export", "Dashboard", "Pivot", "Calendars", "Holidays", "ProductionChart", "Plot", "Distribution Tables")
+
+    ' Add a new workbook to hold the moved sheets
+    Set tempWb = Workbooks.Add(xlWBATWorksheet) ' Starts with one sheet
+
+    Application.ScreenUpdating = False
+    Application.EnableEvents = False
+    Application.Calculation = xlCalculationManual
+    
+    ' Loop through sheets and copy all except the excluded ones, then delete them from the original workbook.
+    For Each ws In ThisWorkbook.Worksheets
+        If Not IsInArray(ws.Name, excludeSheets) Then
+            ws.Copy After:=tempWb.Sheets(tempWb.Sheets.Count)
+            Application.DisplayAlerts = False
+            ws.Delete
+            Application.DisplayAlerts = True
+        End If
+    Next ws
+    
+    ' Delete the default sheet
+    Application.DisplayAlerts = False
+    tempWb.Sheets(1).Delete
+    Application.DisplayAlerts = True
+
+    ' Save the new workbook
+    tempWb.SaveAs fileName:=ThisWorkbook.Path & "\" & newWbName & ".xlsx", FileFormat:=xlOpenXMLWorkbook
+    ' tempWb.Close SaveChanges:=False
+
+    Application.Calculation = xlCalculationAutomatic
+    Application.EnableEvents = True
+
+End Sub
+
+Function IsInArray(valToCheck As String, arr As Variant) As Boolean
+    Dim element As Variant
+    For Each element In arr
+        If element = valToCheck Then
+            IsInArray = True
+            Exit Function
+        End If
+    Next element
+    IsInArray = False
+End Function
+
+
+Function ExportSheetsExist() As Collection
+    Dim ws As Worksheet
+    Dim excludeSheets As Variant
+    Dim exportableSheets As New Collection
+    
+    excludeSheets = Array("Gantt", "Distributions", "Export", "Dashboard", "Pivot", "Calendars", "Holidays", "ProductionChart", "Plot", "Distribution Tables")
+    
+    For Each ws In ThisWorkbook.Worksheets
+        If Not IsInArray(ws.Name, excludeSheets) Then
+            exportableSheets.Add ws.Name
+        End If
+    Next ws
+    
+    Set ExportSheetsExist = exportableSheets
+End Function

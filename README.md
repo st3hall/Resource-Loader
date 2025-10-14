@@ -1,6 +1,6 @@
 
 ## Resource Loader
-[**Download Latest Workbook**](https://github.com/st3hall/Resource-Loader/raw/refs/heads/main/ResourceLoadingWorkbook-R10.xlsm)
+[**Download Latest Workbook**](https://github.com/st3hall/Resource-Loader/raw/refs/heads/main/ResourceLoadingWorkbook-R11.xlsm)
 
 ## Table of Contents
 - [Resource Loader](#resource-loader)
@@ -17,6 +17,7 @@
     - [Distribution](#distribution)
     - [Export](#export)
     - [Dashboard](#dashboard)
+    - [Hidden](#hidden)
   - [Advanced Features](#advanced-features)
     - [Statistical Outputs](#statistical-outputs)
     - [Relationship based Scheduling](#relationship-based-scheduling)
@@ -131,7 +132,12 @@ The "Gantt" sheet is the user will input data, and where the data will be projec
 "Dashboard" is a sheet containing a chart of plotted data. The user can interact with slicers corresponding to the activity description fields. The checkboxes for line of best fit and data lables will be populated on the chart based on user selections as well.
 ![Dashboard](dashboardPlot.png)
 
+On the "Dashboard" sheet to the right of the plot there is an "Export" button. The button will launch a prompt for the user to input a name for the export sheet, then takes the current filtered view from the PivotChart and copys the data to the new sheet. A plot of that data is automatically generated.
 
+![Export Button](dashboardExport.png)
+
+
+#### Hidden
 Sheets have been hidden to avoid unknowinly disrupting the program. 
 - Calendars contains a few tables where the calendars are represented, ie. 5 day, 6 day, 7 day no holiday. It also stores the graphical overlay, to be restored if deleted.
 - Holidays contains a table with a list of all the typical holidays up to New Years Eve 2030.

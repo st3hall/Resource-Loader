@@ -2659,3 +2659,400 @@ Enable via checkbox under **Schedule** to add:
 ---
 
 God Speed.
+
+
+Sub ExportSheetToNewWorkbook()
+    Dim ws As Worksheet
+    Dim newWb As Workbook
+    Dim sheetName As String
+
+    ' Set the worksheet you want to export
+    sheetName = "Sheet1" ' Change this to your sheet name
+    Set ws = ThisWorkbook.Sheets(sheetName)
+
+    ' Copy the sheet to a new workbook
+    ws.Copy
+
+    ' The copied sheet is now in a new workbook
+    Set newWb = ActiveWorkbook
+
+    ' Optional: Save the new workbook
+    newWb.SaveAs Filename:=ThisWorkbook.Path & "\" & sheetName & "_Export.xlsx", FileFormat:=xlOpenXMLWorkbook
+    newWb.Close SaveChanges:=False
+
+    MsgBox "Sheet '" & sheetName & "' exported successfully!"
+End Sub
+
+Sub ExportTwoColumnsToNewWorkbook()
+    Dim sourceSheet As Worksheet
+    Dim exportSheet As Worksheet
+    Dim newWb As Workbook
+    Dim tableRange As Range
+    Dim exportRange As Range
+    Dim col1 As Range, col2 As Range
+    Dim tableName As String
+
+    ' Set your source sheet and table name
+    Set sourceSheet = ThisWorkbook.Sheets("Sheet1") ' Change to your sheet name
+    tableName = "Table1" ' Change to your table name
+
+    ' Get the table range
+    On Error Resume Next
+    Set tableRange = sourceSheet.ListObjects(tableName).Range
+    On Error GoTo 0
+
+    If tableRange Is Nothing Then
+        MsgBox "Table '" & tableName & "' not found.", vbExclamation
+        Exit Sub
+    End If
+
+    ' Define the two columns to copy (e.g., columns 1 and 2 of the table)
+    Set col1 = tableRange.Columns(1)
+    Set col2 = tableRange.Columns(2)
+
+    ' Create a new sheet in the current workbook
+    Set exportSheet = ThisWorkbook.Sheets.Add(After:=ThisWorkbook.Sheets(ThisWorkbook.Sheets.Count))
+    exportSheet.Name = "ExportSheet"
+
+    ' Copy the columns to the new sheet
+    col1.Copy Destination:=exportSheet.Range("A1")
+    col2.Copy Destination:=exportSheet.Range("B1")
+
+    ' Copy the new sheet to a new workbook
+    exportSheet.Copy
+    Set newWb = ActiveWorkbook
+
+    ' Save the new workbook
+    newWb.SaveAs Filename:=ThisWorkbook.Path & "\ExportedColumns.xlsx", FileFormat:=xlOpenXMLWorkbook
+    newWb.Close SaveChanges:=False
+
+    MsgBox "Columns exported successfully!"
+End Sub
+
+Sub ExportPivotTableDataToNewWorkbook()
+    Dim ptSheet As Worksheet
+    Dim pt As PivotTable
+    Dim dataRange As Range
+    Dim exportSheet As Worksheet
+    Dim newWb As Workbook
+
+    ' Set your PivotTable sheet and PivotTable name
+    Set ptSheet = ThisWorkbook.Sheets("PivotSheet") ' Change to your sheet name
+    Set pt = ptSheet.PivotTables("PivotTable1")     ' Change to your PivotTable name
+
+    ' Get the visible data range of the PivotTable
+    Set dataRange = pt.TableRange1
+
+    ' Create a new sheet in the current workbook
+    Set exportSheet = ThisWorkbook.Sheets.Add(After:=ThisWorkbook.Sheets(ThisWorkbook.Sheets.Count))
+    exportSheet.Name = "PivotExport"
+
+    ' Copy the PivotTable data to the new sheet
+    dataRange.Copy Destination:=exportSheet.Range("A1")
+
+    ' Export the new sheet to a new workbook
+    exportSheet.Copy
+    Set newWb = ActiveWorkbook
+
+    ' Save the new workbook
+    newWb.SaveAs Filename:=ThisWorkbook.Path & "\PivotExport.xlsx", FileFormat:=xlOpenXMLWorkbook
+    newWb.Close SaveChanges:=False
+
+    MsgBox "PivotTable data exported successfully!"
+End Sub
+
+
+Sub ExportPivotTableWithPrompt()
+    Dim ptSheet As Worksheet
+    Dim pt As PivotTable
+    Dim dataRange As Range
+    Dim exportSheet As Worksheet
+    Dim newWb As Workbook
+    Dim fileName As String
+    Dim savePath As String
+
+    ' Set your PivotTable sheet and PivotTable name
+    Set ptSheet = ThisWorkbook.Sheets("PivotSheet") ' Change to your sheet name
+    Set pt = ptSheet.PivotTables("PivotTable1")     ' Change to your PivotTable name
+
+    ' Get the visible data range of the PivotTable
+    Set dataRange = pt.TableRange1
+
+    ' Prompt for file name
+    fileName = InputBox("Enter a name for the exported workbook:", "Export PivotTable")
+    If fileName = "" Then
+        MsgBox "Export cancelled.", vbExclamation
+        Exit Sub
+    End If
+
+    ' Create a new sheet in the current workbook
+    Set exportSheet = ThisWorkbook.Sheets.Add(After:=ThisWorkbook.Sheets(ThisWorkbook.Sheets.Count))
+    exportSheet.Name = "PivotExport"
+
+    ' Copy the PivotTable data to the new sheet
+    dataRange.Copy Destination:=exportSheet.Range("A1")
+
+    ' Copy the new sheet to a new workbook
+    exportSheet.Copy
+    Set newWb = ActiveWorkbook
+
+    ' Save the new workbook
+    savePath = ThisWorkbook.Path & "\" & fileName & ".xlsx"
+    newWb.SaveAs Filename:=savePath, FileFormat:=xlOpenXMLWorkbook
+    newWb.Close SaveChanges:=False
+
+    MsgBox "PivotTable data exported successfully to " & savePath
+End Sub
+
+Sub ExportPivotTableWithPrompt()
+    Dim ptSheet As Worksheet
+    Dim pt As PivotTable
+    Dim dataRange As Range
+    Dim exportSheet As Worksheet
+    Dim newWb As Workbook
+    Dim sheetName As String
+
+    ' Prompt for the new sheet name
+    sheetName = InputBox("Enter a name for the export sheet:", "Export Sheet Name")
+    If sheetName = "" Then
+        MsgBox "Export cancelled. No sheet name provided.", vbExclamation
+        Exit Sub
+    End If
+
+    ' Set your PivotTable sheet and PivotTable name
+    Set ptSheet = ThisWorkbook.Sheets("PivotSheet") ' Change to your sheet name
+    Set pt = ptSheet.PivotTables("PivotTable1")     ' Change to your PivotTable name
+
+    ' Get the visible data range of the PivotTable
+    Set dataRange = pt.TableRange1
+
+    ' Create a new sheet in the current workbook
+    Set exportSheet = ThisWorkbook.Sheets.Add(After:=ThisWorkbook.Sheets(ThisWorkbook.Sheets.Count))
+    On Error Resume Next
+    exportSheet.Name = sheetName
+    If Err.Number <> 0 Then
+        MsgBox "Invalid or duplicate sheet name. Please try again.", vbCritical
+        Exit Sub
+    End If
+    On Error GoTo 0
+
+    ' Copy the PivotTable data to the new sheet
+    dataRange.Copy Destination:=exportSheet.Range("A1")
+
+    ' Export the new sheet to a new workbook
+    exportSheet.Copy
+    Set newWb = ActiveWorkbook
+
+    ' Save the new workbook
+    newWb.SaveAs Filename:=ThisWorkbook.Path & "\" & sheetName & "_Export.xlsx", FileFormat:=xlOpenXMLWorkbook
+    newWb.Close SaveChanges:=False
+
+    MsgBox "PivotTable data exported successfully to '" & sheetName & "_Export.xlsx'."
+End Sub
+
+Sub CreateChartOnSheet(sheetName As String)
+    Dim ws As Worksheet
+    Dim chartObj As ChartObject
+    Dim lastRow As Long
+    Dim chartRangeX As Range, chartRangeY As Range
+
+    ' Set the worksheet
+    Set ws = ThisWorkbook.Sheets(sheetName)
+
+    ' Find the last row with data in column A (assumes both columns have same number of rows)
+    lastRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
+
+    ' Define the ranges for X and Y values
+    Set chartRangeX = ws.Range("A2:A" & lastRow)
+    Set chartRangeY = ws.Range("B2:B" & lastRow)
+
+    ' Add a chart object to the sheet
+    Set chartObj = ws.ChartObjects.Add(Left:=300, Width:=500, Top:=50, Height:=300)
+
+    With chartObj.Chart
+        .ChartType = xlLine
+        .SeriesCollection.NewSeries
+        With .SeriesCollection(1)
+            .Name = "=""Production Over Time"""
+            .XValues = chartRangeX
+            .Values = chartRangeY
+        End With
+        .HasTitle = True
+        .ChartTitle.Text = "Production Over Time"
+    End With
+End Sub
+
+
+Function ExportPivotTableDataToNewWorkbook() As String
+    Dim ptSheet As Worksheet
+    Dim pt As PivotTable
+    Dim dataRange As Range
+    Dim exportSheet As Worksheet
+    Dim newWb As Workbook
+    Dim sheetName As String
+
+    ' Prompt for the new sheet name
+    sheetName = InputBox("Enter a name for the export sheet:", "Export Sheet Name")
+    If sheetName = "" Then
+        MsgBox "Export cancelled. No sheet name provided.", vbExclamation
+        ExportPivotTableDataToNewWorkbook = ""
+        Exit Function
+    End If
+
+    ' Set your PivotTable sheet and PivotTable name
+    Set ptSheet = ThisWorkbook.Sheets("PivotSheet") ' Change to your sheet name
+    Set pt = ptSheet.PivotTables("PivotTable1")     ' Change to your PivotTable name
+
+    ' Get the visible data range of the PivotTable
+    Set dataRange = pt.TableRange1
+
+    ' Create a new sheet in the current workbook
+    Set exportSheet = ThisWorkbook.Sheets.Add(After:=ThisWorkbook.Sheets(ThisWorkbook.Sheets.Count))
+    On Error Resume Next
+    exportSheet.Name = sheetName
+    If Err.Number <> 0 Then
+        MsgBox "Invalid or duplicate sheet name. Please try again.", vbCritical
+        ExportPivotTableDataToNewWorkbook = ""
+        Exit Function
+    End If
+    On Error GoTo 0
+
+    ' Copy the PivotTable data to the new sheet
+    dataRange.Copy Destination:=exportSheet.Range("A1")
+
+    ' Export the new sheet to a new workbook
+    exportSheet.Copy
+    Set newWb = ActiveWorkbook
+
+    ' Save the new workbook
+    newWb.SaveAs Filename:=ThisWorkbook.Path & "\" & sheetName & "_Export.xlsx", FileFormat:=xlOpenXMLWorkbook
+    newWb.Close SaveChanges:=False
+
+    MsgBox "PivotTable data exported successfully to '" & sheetName & "_Export.xlsx'."
+
+    ' Return the sheet name
+    ExportPivotTableDataToNewWorkbook = sheetName
+End Function
+
+Sub MoveSheetsExceptSpecified()
+    Dim ws As Worksheet
+    Dim excludeSheets As Variant
+    Dim newWbName As String
+    Dim tempWb As Workbook
+
+    ' Prompt for the new workbook name
+    newWbName = InputBox("Enter a name for the new workbook (without extension):", "New Workbook Name")
+    If newWbName = "" Then
+        MsgBox "Operation cancelled. No workbook name provided.", vbExclamation
+        Exit Sub
+    End If
+    
+    ' List of sheet names to exclude from moving
+    excludeSheets = Array("Gantt", "Distributions", "Export", "Dashboard", "Pivot","Calendars", "Holidays", "ProductionChart", "Plot", "Distribution Tables")
+
+    ' Loop through sheets and move all except the specified one
+    For Each ws In ThisWorkbook.Worksheets
+        If Not IsInArray(ws.Name, excludeSheets) Then
+            ' This sheet is NOT in the exclude list
+            ws.Copy
+            Set tempWb = ActiveWorkbook
+            tempWb.SaveAs Filename:=ThisWorkbook.Path & "\" & newWbName & ".xlsx", FileFormat:=xlOpenXMLWorkbook
+            tempWb.Close SaveChanges:=False
+        End If
+    Next ws
+    MsgBox "Sheets moved to '" & newWbName & ".xlsx" 
+End Sub
+
+Function IsInArray(valToCheck As String, arr As Variant) As Boolean
+    Dim element As Variant
+    For Each element In arr
+        If element = valToCheck Then
+            IsInArray = True
+            Exit Function
+        End If
+    Next element
+    IsInArray = False
+End Function
+
+Sub MoveSheetsExceptSpecified()
+    Dim ws As Worksheet
+    Dim excludeSheets As Variant
+    Dim newWbName As String
+    Dim tempWb As Workbook
+
+    ' Prompt for the new workbook name
+    newWbName = InputBox("Enter a name for the new workbook (without extension):", "New Workbook Name")
+    If newWbName = "" Then
+        MsgBox "Operation cancelled. No workbook name provided.", vbExclamation
+        Exit Sub
+    End If
+
+    ' List of sheet names to exclude from moving
+    excludeSheets = Array("Gantt", "Distributions", "Export", "Dashboard", "Pivot", "Calendars", "Holidays", "ProductionChart", "Plot", "Distribution Tables")
+
+    ' Add a new workbook to hold the moved sheets
+    Set tempWb = Workbooks.Add(xlWBATWorksheet) ' Starts with one sheet
+
+    ' Delete the default sheet
+    Application.DisplayAlerts = False
+    tempWb.Sheets(1).Delete
+    Application.DisplayAlerts = True
+
+    ' Loop through sheets and copy all except the excluded ones, then delete them from the original workbook.
+    For Each ws In ThisWorkbook.Worksheets
+        If Not IsInArray(ws.Name, excludeSheets) Then
+            ws.Copy After:=tempWb.Sheets(tempWb.Sheets.Count)           
+            Application.DisplayAlerts = False
+            ws.Delete
+            Application.DisplayAlerts = True
+        End If
+    Next ws
+
+    ' Save the new workbook
+    tempWb.SaveAs Filename:=ThisWorkbook.Path & "\" & newWbName & ".xlsx", FileFormat:=xlOpenXMLWorkbook
+    tempWb.Close SaveChanges:=False
+
+    MsgBox "Sheets moved to '" & newWbName & ".xlsx' excluding specified sheets."
+End Sub
+
+Function IsInArray(valToCheck As String, arr As Variant) As Boolean
+    Dim element As Variant
+    For Each element In arr
+        If element = valToCheck Then
+            IsInArray = True
+            Exit Function
+        End If
+    Next element
+    IsInArray = False
+End Function
+
+
+Private Sub ResetButton_Click()
+    Dim response As VbMsgBoxResult
+    Dim cancelresponse As VbMsgBoxResult
+    ' First check if there are any exportable sheets
+    If ExportSheetsExist Then
+        response = MsgBox("This will reset the worksheet data, including removing any exported tabs. Proceed?", vbYesNo + vbQuestion, "Confirm Action")
+        
+        If response = vbYes Then
+            ' Proceed with reset
+            Call InitializeColumnIndex
+            Set plotWS = ThisWorkbook.Sheets("Plot")
+            ResetButton.Enabled = False
+            Call ClearFromJ2
+            plotWS.Cells.ClearContents
+        Else
+            ' Offer to export plots before canceling
+            cancelresponse = MsgBox("Would you like to export your plots before canceling?", vbYesNo + vbQuestion, "Export Option")
+            
+            If cancelresponse = vbYes Then
+                Call MoveSheetsExceptSpecified
+            Else
+                MsgBox "Action canceled.", vbExclamation
+            End If
+        End If
+    Else
+        ' No exportable sheets, just clear the form
+        Call ClearFromJ2
+    End If
+End Sub

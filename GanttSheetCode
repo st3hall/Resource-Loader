@@ -24,27 +24,6 @@ Private Sub InfoButton_Click()
 End Sub
 
 
-
-Private Sub Label4_Click()
-
-End Sub
-
-Private Sub Label5_Click()
-
-End Sub
-
-Private Sub Label6_Click()
-
-End Sub
-
-Private Sub Label7_Click()
-
-End Sub
-
-Private Sub ListBox1_Click()
-
-End Sub
-
 Private Sub RelationBox_Click()
     Call InitializeColumnIndex
     Dim startColLetter As String, endColLetter As String
@@ -63,9 +42,40 @@ Private Sub RelationBox_Click()
 End Sub
 
 Private Sub ResetButton_Click()
+    Dim exportableSheets As Collection
+    Dim sheetName As Variant
+    Dim response As VbMsgBoxResult
+    Dim plotWS As Worksheet
+
+    Set exportableSheets = ExportSheetsExist()
+
+    If exportableSheets.Count <> 0 Then
+        response = MsgBox("Export Plots?", vbYesNo + vbQuestion, "Confirm Action")
+        If response = vbYes Then
+            Call MoveSheetsExceptSpecified
+            MsgBox "Plots have been exported", vbExclamation
+        Else
+            For Each sheetName In exportableSheets
+                Application.DisplayAlerts = False
+                ThisWorkbook.Sheets(sheetName).Delete
+                Application.DisplayAlerts = True
+            Next sheetName
+        End If
+    End If
+
     Call InitializeColumnIndex
+    On Error Resume Next
     Set plotWS = ThisWorkbook.Sheets("Plot")
+    On Error GoTo 0
+
+    If plotWS Is Nothing Then
+        MsgBox "'Plot' sheet not found.", vbExclamation
+        Exit Sub
+    End If
+
     ResetButton.Enabled = False
+    GraphButton.Enabled = False
+    ExportPlots.Enabled = False
     Call ClearFromJ2
     plotWS.Cells.ClearContents
 End Sub
@@ -73,6 +83,7 @@ End Sub
 Private Sub ScheduleButton_Click()
     'AddPlot.Enabled = True
     ResetButton.Enabled = True
+    GraphButton.Enabled = True
     Call RunResources
 End Sub
 
@@ -83,6 +94,7 @@ Private Sub GraphButton_Click()
     wsDash.Activate
     UpdateChartFormatting
 End Sub
+
 
 
 'Author: Steve Hall P.E.

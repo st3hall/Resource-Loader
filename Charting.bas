@@ -163,6 +163,7 @@ Sub CreateChartOnNewSheet()
     'Call FormatChart(chartSheet, PlotForm.ShowDataLables.Value, PlotForm.ShowTrendLine.Value)
     Call UpdateChartFormatting(chartSheet)
 End Sub
+
 Sub UpdateChartFormatting(chartObj As Chart)
     Dim showLabels As Boolean
     Dim showTrend As Boolean
@@ -176,7 +177,6 @@ Sub UpdateChartFormatting(chartObj As Chart)
 
     Call FormatChart(chartObj, showLabels, showTrend)
 End Sub
-
 
 Sub FormatChart(chartObj As Chart, ShowDataLabels As Boolean, ShowTrendLine As Boolean)
 
