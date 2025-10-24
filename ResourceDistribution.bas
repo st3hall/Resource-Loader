@@ -374,6 +374,18 @@ Sub WriteToCells()
             ' Range(Cells(currentRow, startingCol), Cells(currentRow, startingCol + UBound(resultArray))).Value = Application.WorksheetFunction.Transpose(resultArray)
 
             ' Write to Export sheet
+            ' Write pre-start row
+
+            Dim preStartDate As Date
+            preStartDate = startDate - 1
+
+            For j = 1 To outputKeys.Count
+                outputSheet.Cells(exportRow, j).Value = Cells(currentRow, ColumnIndex(outputKeys(j))).Value
+            Next j
+            outputSheet.Cells(exportRow, outputDateCol).Value = preStartDate
+            outputSheet.Cells(exportRow, outputDataCol).Value = 0
+            exportRow = exportRow + 1
+
             Dim i As Long
             For i = LBound(resultArray) To UBound(resultArray)
                 Cells(currentRow, startingCol + i).Value = resultArray(i)
@@ -786,27 +798,46 @@ End Sub
 Sub RunResources()
     Dim success As Boolean
     Dim targetWS As Worksheet
-  
+    Dim tStart As Double, tStepStart As Double
+
+    tStart = Timer
     Set targetWS = ThisWorkbook.Sheets("Gantt")
     
-    If Not ActiveSheet Is targetWS Then
-        targetWS.Activate
-    End If
+    If Not ActiveSheet Is targetWS Then targetWS.Activate
 
     Call InitializeColumnIndex
     Call ClearFromJ2
-    
+
+    tStepStart = Timer
     success = CalculateStartAndFinish(True)
-    If Not success Then
-        Exit Sub
-    End If
+    Debug.Print "CalculateStartAndFinish took " & Format(Timer - tStepStart, "0.000") & " seconds"
+    If Not success Then Exit Sub
+
+    tStepStart = Timer
     Call PopulateDateHeaders
+    Debug.Print "PopulateDateHeaders took " & Format(Timer - tStepStart, "0.000") & " seconds"
+
+    tStepStart = Timer
     Call WriteToCells
+    Debug.Print "WriteToCells took " & Format(Timer - tStepStart, "0.000") & " seconds"
+
+    tStepStart = Timer
     Call SumValuesByDate(False)
+    Debug.Print "SumValuesByDate took " & Format(Timer - tStepStart, "0.000") & " seconds"
+
+    tStepStart = Timer
     Call GetTrendlineStats
+    Debug.Print "GetTrendlineStats took " & Format(Timer - tStepStart, "0.000") & " seconds"
+
+    tStepStart = Timer
     Call DeleteEmptyRows(ThisWorkbook.Sheets("Export"))
+    Debug.Print "DeleteEmptyRows took " & Format(Timer - tStepStart, "0.000") & " seconds"
+
+    tStepStart = Timer
     Call CreatePivotChartWithSlicerPanel
-    
+    Debug.Print "CreatePivotChartWithSlicerPanel took " & Format(Timer - tStepStart, "0.000") & " seconds"
+
+    Debug.Print "Total RunResources time: " & Format(Timer - tStart, "0.000") & " seconds"
 End Sub
 
 Sub ShowMyForm()
