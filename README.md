@@ -1,6 +1,7 @@
 
 ## Resource Loader
-[**Download Latest Workbook**](https://github.com/st3hall/Resource-Loader/raw/refs/heads/main/ResourceLoadingWorkbook-R12.xlsm)
+[**Download Latest Workbook**](https://austinind-my.sharepoint.com/:x:/g/personal/shall_austin-ind_com/ETIkmTckhwRJr71nI4ibsPcBMNtV41ZNgAlx7kbdqFqYOA?download=1)
+
 
 ## Table of Contents
 - [Resource Loader](#resource-loader)
