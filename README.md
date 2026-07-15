@@ -1,6 +1,6 @@
 
 ## Resource Loader
-[**Download Latest Workbook**](https://austinind-my.sharepoint.com/:x:/g/personal/shall_austin-ind_com/ETIkmTckhwRJr71nI4ibsPcBMNtV41ZNgAlx7kbdqFqYOA?download=1)
+[**Download Latest Workbook**](https://austinind-my.sharepoint.com/personal/shall_austin-ind_com/Documents/Documents/QUAD.xlsm?download=1)
 
 
 ## Table of Contents
